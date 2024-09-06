@@ -1,0 +1,42 @@
+{
+	"workflows": [
+		{
+			"workflow_name": "delete_file",
+			"workflow_webhook": "https://172.27.0.1:3443/api/v1/hooks/webhook_28b4297d-a15a-4747-bc6b-a348e0f78aa7",
+			"address_attacks": [
+				{
+					"mitre_id": "T1222.002",
+					"mitre_technique": "File and Directory Permissions Modification: Linux and Mac File and Directory Permissions Modification"
+				},
+				{
+					"mitre_id": "T1204.002",
+					"mitre_technique": "User Execution: Malicious File"
+				}
+			]
+		},
+		{
+			"workflow_name": "close_conn",
+			"workflow_webhook": "https://172.27.0.1:3443/api/v1/hooks/webhook_aa2e31ea-dd3e-4471-ad4e-3f032bdb381d",
+			"address_attacks": [
+				{
+					"mitre_id": "T1041",
+					"mitre_technique": "Exfiltration Over C2 Channel"
+				},
+				{
+					"mitre_id": "T1219",
+					"mitre_technique": "Remote Access Software"
+				}
+			]
+		},
+		{
+			"workflow_name": "handle_ransomware",
+			"workflow_webhook": "https://localhost:3443/api/v1/hooks/webhook_16bf2161-f3cb-4dc0-b53b-e580cdedf060",
+			"address_attacks": [
+				{
+					"mitre_id": "T1204.002",
+					"mitre_technique": "User Execution: Malicious File"
+				}
+			]
+		}
+	]
+}
