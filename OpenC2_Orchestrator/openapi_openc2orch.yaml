@@ -1,0 +1,155 @@
+openapi: 3.0.2
+info:
+  title: OpenC2 Producer Command Creation App
+  description: 'API for creating an OpenC2 command as a Producer to deliver it on an OpenC2 Consumer'
+  version: 0.0.1
+servers:
+  - url: http://localhost:8888/
+    description: OpenC2 API
+components:
+  schemas:
+    'DeleteFileInfo':
+      type: object
+      required:
+        - actuator_ip
+        - file_path
+      properties:
+        actuator_ip:
+          type: string
+          description: IP of OpenC2 Actuator/Consumer of command
+        file_path:
+          type: string
+          description: File path of file to be deleted
+          
+    'CloseConnInfo':
+      type: object
+      required:
+        - actuator_ip
+        - pid
+        - dst_ip
+        - src_port
+        - dst_port
+      properties:
+        actuator_ip:
+          type: string
+          description: IP of OpenC2 Actuator/Consumer of command
+        pid:
+          type: integer
+          description: PID of established connection process
+        dst_ip:
+          type: string
+          description: Dest IP of established connection
+        src_port: 
+          type: integer
+          description: Source port of established connection
+        dst_port: 
+          type: integer
+          description: Dest port of established connection
+          
+    'OpenC2CommandHeaders':
+      type: object
+      required:
+        - request_id
+        - created
+        - from
+        - to
+      properties:
+        request_id:
+          type: string
+          description: ID of a OpenC2 Command Request
+        created:
+          type: integer
+          description: OpenC2 Command creation Timestamp
+        from:
+          type: string
+          description: Hostname or IP of OpenC2 sender
+        to:
+          type: string
+          description: Hostname or IP of OpenC2 receiver
+          
+    'OpenC2CommandResponse':
+      type: object
+      required:
+        - status
+        - status_text
+        - results
+      properties:
+        status:
+          type: integer
+          description: Status code of OpenC2 command execution
+        status_text:
+          type: string
+          description: Status text of OpenC2 command execution
+        results:
+          type: string
+          description: Results of command execution        
+          
+    'OpenC2Response':
+      type: object
+      required: 
+        - headers
+        - command_response
+      properties:
+        headers: 
+          $ref: '#/components/schemas/OpenC2CommandHeaders'
+        command_response:
+          $ref: '#/components/schemas/OpenC2CommandResponse'
+    
+    'ErrorMessage':
+      type: object
+      required:
+        - error_code
+        - error_message
+      properties:
+        error_code:
+          type: string
+        error_message:
+          type: string
+paths:
+  /delete_file:
+    post:
+      summary: Delete a file on OpenC2 consumer/actuator
+      description: Send an OpenC2 command to consumer to delete a file
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteFileInfo'
+      responses:
+        '200':
+          description: Command successfully executed. File deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenC2Response'
+        'default':
+          description: Unexpected error
+          content:
+            'application/json':
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+                
+  /close_connection:
+    post:
+      summary: Close a TCP connection on OpenC2 consumer/actuator
+      description: Send an OpenC2 command to consumer to close a TCP connection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CloseConnInfo'
+      responses:
+        '200':
+          description: Command successfully executed. Connection closed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenC2Response'
+        'default':
+          description: Unexpected error
+          content:
+            'application/json':
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
