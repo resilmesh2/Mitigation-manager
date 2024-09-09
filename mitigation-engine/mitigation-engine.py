@@ -16,6 +16,8 @@ CONTENT_TYPE_HEADER = {'Content-Type': 'application/json'}
 NATS_BROKER = 'nats://localhost:4222'
 #Alerts topic
 NATS_SUBJECT = 'alerts'
+#Workflows file
+WORKFLOWS_FILE = 'workflows.json'
 
 #Existent workflows pool. Loaded from JSON file
 workflows = {}
@@ -25,7 +27,7 @@ ncat_fired = False
 #Get workflow capabilities from file
 def get_workflows():
     global workflows
-    with open('workflows.json', 'r') as workflows_file:
+    with open(WORKFLOWS_FILE, 'r') as workflows_file:
         workflows = json.load(workflows_file)
 
 #Mitigation decision process. Rule-based for testing mitigation results. To be evolved with CRUSOE 
