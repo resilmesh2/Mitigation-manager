@@ -12,14 +12,13 @@
 </group>
 
 <group name="filesystem">
-	<rule id="100004" level="8">
-    	  <if_sid>554</if_sid>
-    	  <description>Executable file added to filesystem</description>
-	  <mitre>
-		<id>T1204.002</id>
-	  </mitre>
-	  <field name="file">.py$</field>
-	  <field name="file">.exe$</field>
-	  <field name="file">.sh$</field>
-	</rule>
+        <rule id="100004" level="8">
+          <if_sid>554</if_sid>
+          <description>Executable file added to filesystem</description>
+          <mitre>
+                <id>T1204.002</id>
+          </mitre>
+          <field name="file" type="pcre2">.*\.(py|exe|sh)$</field>
+        </rule>
 </group>
+
