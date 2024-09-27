@@ -26,11 +26,13 @@ WORKFLOWS_FILE = 'workflows.json'
 # Existent workflows pool.  Loaded from JSON file
 workflows = {}
 
+
 # Get workflow capabilities from file
 def get_workflows():
     global workflows
     with open(WORKFLOWS_FILE, 'r') as workflows_file:
         workflows = json.load(workflows_file)
+
 
 # Mitigation decision process. Rule-based for testing mitigation
 # results.  To be evolved with CRUSOE
@@ -45,6 +47,7 @@ def choose_mitigation(alert: dict) -> str | None:
     # No match
     return None
 
+
 # Create execution argument for Shuffle workflow execution
 def create_execution_arg(workflow: str, alert: dict) -> dict:
     w0 = workflows['workflows'][0]['workflow_webhook']
@@ -56,7 +59,7 @@ def create_execution_arg(workflow: str, alert: dict) -> dict:
             'sha1_after': alert['syscheck']['sha1_after'],
             'file_path': alert['syscheck']['path'],
             'actuator_ip': alert['agent']['ip'],
-            'agent_id': alert['agent']['id']
+            'agent_id': alert['agent']['id'],
         }
     if workflow == w1:
         # Caso close conn
@@ -66,10 +69,11 @@ def create_execution_arg(workflow: str, alert: dict) -> dict:
             'dst_port': alert['data']['dst_port'],
             'src_port': alert['data']['src_port'],
             'pid': alert['data']['pid'],
-            'agent_id': alert['agent']['id']
+            'agent_id': alert['agent']['id'],
         }
 
     raise ValueError('Unknown workflow', workflow)
+
 
 # Return MITRE ATTCK IDs from Wazuh threat alert
 def get_attack_mitre_techniques_id(alert: dict) -> list[str]:
@@ -97,7 +101,9 @@ def get_valid_workflows(attack_mitre_techniques_id: list[str]):
 # TODO. Will represent CRUSOE info query for supporting decision
 # process
 def query_crusoe_information(query: dict):
-    request = requests.post(CRUSOE_GRAPHQL_URL, json=query, headers=CONTENT_TYPE_HEADER, verify=False)
+    request = requests.post(
+        CRUSOE_GRAPHQL_URL, json=query, headers=CONTENT_TYPE_HEADER, verify=False
+    )
     if request.status_code == 200:
         response = json.loads(request.content)
         return response
@@ -136,7 +142,6 @@ def select_workflow(alert_log):
 
 
 async def main(handler):
-
     async def message_handler(msg: Msg):
         try:
             print(f'Received a message on "{msg.subject} {msg.reply}"')
@@ -156,7 +161,7 @@ async def main(handler):
     print('Connecting to NATS...')
     nc = await nats.connect(servers=[NATS_BROKER])
     print('Subscribing to alerts...')
-    sub = await nc.subscribe(NATS_SUBJECT, cb=message_handler)
+    await nc.subscribe(NATS_SUBJECT, cb=message_handler)
     print('Ready to mitigate')
     while True:
         await asyncio.sleep(5)
