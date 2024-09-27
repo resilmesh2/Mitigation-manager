@@ -1,98 +1,103 @@
-import json
-import nats
-import sys
 import asyncio
-import requests
 import datetime
+import json
+import signal
 
-#Mitigation Engine. Subscriber de NATS que recibe todo el log de la alerta de Wazuh y 
-#la procesa eligiendo un Workflow (y potencialmente un comando OpenC2) para enviar un POST a laAPI de Shuffle para la ejecucion de un workflow
+import nats
+from nats.aio.msg import Msg
+import requests
 
-#CRUSOE GraphQL endpoint
+# Mitigation Engine. Subscriber de NATS que recibe todo el log de la
+# alerta de Wazuh y la procesa eligiendo un Workflow (y potencialmente
+# un comando OpenC2) para enviar un POST a laAPI de Shuffle para la
+# ejecucion de un workflow
+
+# CRUSOE GraphQL endpoint
 CRUSOE_GRAPHQL_URL = 'http://localhost:4001/graphql'
-#JSON Content-type Header
+# JSON Content-type Header
 CONTENT_TYPE_HEADER = {'Content-Type': 'application/json'}
-#Broker PubSub
-NATS_BROKER = 'nats://localhost:4222'
-#Alerts topic
+# Broker PubSub
+NATS_BROKER = 'nats://nats:4222'
+# Alerts topic
 NATS_SUBJECT = 'alerts'
-#Workflows file
+# Workflows file
 WORKFLOWS_FILE = 'workflows.json'
 
-#Existent workflows pool. Loaded from JSON file
+# Existent workflows pool.  Loaded from JSON file
 workflows = {}
 
-ncat_fired = False
-
-#Get workflow capabilities from file
+# Get workflow capabilities from file
 def get_workflows():
     global workflows
     with open(WORKFLOWS_FILE, 'r') as workflows_file:
         workflows = json.load(workflows_file)
 
-#Mitigation decision process. Rule-based for testing mitigation results. To be evolved with CRUSOE 
-def choose_mitigation(alert):
-    global ncat_fired
-    rule_id = alert['rule']['id']
-    if rule_id == "100002": #Caso close conn
-        return workflows['workflows'][1]['workflow_webhook']
-    elif rule_id == "100003": #Caso delete file
-        return workflows['workflows'][0]['workflow_webhook']
-    elif rule_id == "100004": #Caso delete file
-        return workflows['workflows'][2]['workflow_webhook']
-
+# Mitigation decision process. Rule-based for testing mitigation
+# results.  To be evolved with CRUSOE
+def choose_mitigation(alert: dict) -> str | None:
+    match alert['rule']['id']:
+        case '100002':  # close-conn
+            return workflows['workflows'][1]['workflow_webhook']
+        case '100003':  # delete-file
+            return workflows['workflows'][0]['workflow_webhook']
+        case '100004':  # delete-file
+            return workflows['workflows'][2]['workflow_webhook']
+    # No match
     return None
 
-#Create execution argument for Shuffle workflow execution
-def create_execution_arg(workflow, alert):
-    arg = {}
-    if (workflow == workflows['workflows'][0]['workflow_webhook']) or (workflow == workflows['workflows'][2]['workflow_webhook']):
-        #Caso delete_file y ransomware
-        arg = {
-                "sha1_after": alert['syscheck']['sha1_after'],
-                "file_path": alert['syscheck']['path'],
-                "actuator_ip": alert['agent']['ip'], 
-                "agent_id": alert['agent']['id']
-            }
+# Create execution argument for Shuffle workflow execution
+def create_execution_arg(workflow: str, alert: dict) -> dict:
+    w0 = workflows['workflows'][0]['workflow_webhook']
+    w1 = workflows['workflows'][1]['workflow_webhook']
+    w2 = workflows['workflows'][2]['workflow_webhook']
+    if workflow == w0 or workflow == w2:
+        # Caso delete_file y ransomware
+        return {
+            'sha1_after': alert['syscheck']['sha1_after'],
+            'file_path': alert['syscheck']['path'],
+            'actuator_ip': alert['agent']['ip'],
+            'agent_id': alert['agent']['id']
+        }
+    if workflow == w1:
+        # Caso close conn
+        return {
+            'actuator_ip': alert['agent']['ip'],
+            'dst_ip': alert['data']['dst_ip'],
+            'dst_port': alert['data']['dst_port'],
+            'src_port': alert['data']['src_port'],
+            'pid': alert['data']['pid'],
+            'agent_id': alert['agent']['id']
+        }
 
-    elif workflow == workflows['workflows'][1]['workflow_webhook']:
-        #Caso close conn
-        arg = {
-                "actuator_ip": alert['agent']['ip'],
-                "dst_ip": alert['data']['dst_ip'],
-                "dst_port": alert['data']['dst_port'],
-                "src_port": alert['data']['src_port'],
-                "pid": alert['data']['pid'],
-                "agent_id": alert['agent']['id']
-            }
+    raise ValueError('Unknown workflow', workflow)
 
-    return json.dumps(arg)
-
-
-#Return MITRE ATTCK IDs from Wazuh threat alert
-def get_attack_mitre_techniques_id(alert):
+# Return MITRE ATTCK IDs from Wazuh threat alert
+def get_attack_mitre_techniques_id(alert: dict) -> list[str]:
     return alert['rule']['mitre']['id']
 
 
-#Mapping of Threat and Workflows MITRE ATTCK ID to form an initial set of valid workflows
-def get_valid_workflows(attack_mitre_techniques_id):
+# Mapping of Threat and Workflows MITRE ATTCK ID to form an initial
+# set of valid workflows
+def get_valid_workflows(attack_mitre_techniques_id: list[str]):
     valid_workflows = []
-    #Recorrer lista de workflows del JSON
+    # Recorrer lista de workflows del JSON
     for workflow in workflows['workflows']:
         for addressed_attack in workflow['address_attacks']:
             if addressed_attack['mitre_id'] in attack_mitre_techniques_id:
                 valid_workflows.append(workflow)
                 break
-    
-    #Se crea el diccionario (JSON) con los workflows válidos que se devuelve
-    #Se mantiene la misma estructura de JSON de capabilities
-    valid_workflows_dict = {"workflows": valid_workflows}
+
+    # Se crea el diccionario (JSON) con los workflows válidos que se
+    # devuelve.  Se mantiene la misma estructura de JSON de
+    # capabilities
+    valid_workflows_dict = {'workflows': valid_workflows}
     return valid_workflows_dict
 
 
-#TODO. Will represent CRUSOE info query for supporting decision process
-def query_crusoe_information(query):
-    request = requests.post(CRUSOE_GRAPHQL_URL, data=json.dumps(query), headers=CONTENT_TYPE_HEADER, verify=False)
+# TODO. Will represent CRUSOE info query for supporting decision
+# process
+def query_crusoe_information(query: dict):
+    request = requests.post(CRUSOE_GRAPHQL_URL, json=query, headers=CONTENT_TYPE_HEADER, verify=False)
     if request.status_code == 200:
         response = json.loads(request.content)
         return response
@@ -100,55 +105,76 @@ def query_crusoe_information(query):
         return None
 
 
-#Main method that groups all algorithm steps. Triggered when alert received in pubsub topic
+# Main method that groups all algorithm steps.  Triggered when alert
+# received in pubsub topic
 def select_workflow(alert_log):
-    global ncat_fired
     alert_json = json.loads(alert_log)
 
-    #Obtención de las MITRE ID Techniques del ataque
+    # Obtención de las MITRE ID Techniques del ataque
     mitre_ids = get_attack_mitre_techniques_id(alert_json)
-    
-    #Obtención subconjunto de workflows válidos en base a mapeo MITRE ID 
-    valid_workflows = get_valid_workflows(mitre_ids)
-    print("VALID WORKFLOWS")
-    print(valid_workflows)
 
-    #TODO Query situational awareness information from CRUSOE
-    #crusoe_info = query_crusoe_information()
-    
-    #Decisión de workflow entre el subconjunto de válidos 
-    #selected_workflow = choose_mitigation(valid_workflows, alert_json, crusoe_info)
+    # Obtención subconjunto de workflows válidos en base a mapeo MITRE ID
+    valid_workflows = get_valid_workflows(mitre_ids)
+    print(f'Found a total of {len(valid_workflows)} valid workflows')
+
+    # TODO Query situational awareness information from CRUSOE
+    # crusoe_info = query_crusoe_information()
+
+    # Decisión de workflow entre el subconjunto de válidos
+    # selected_workflow = choose_mitigation(valid_workflows, alert_json, crusoe_info)
     selected_workflow = choose_mitigation(alert_json)
 
-    #Creación del argumento de ejecución para Shuffle
+    # Edge case: no workflow
+    if selected_workflow is None:
+        raise ValueError('No workflow selected')
+
+    # Creación del argumento de ejecución para Shuffle
     execution_arg = create_execution_arg(selected_workflow, alert_json)
 
-    #Ejecución workflow seleccionado en Shuffle
-    if alert_json['rule']['id'] != "100002" or not ncat_fired:
-        response = requests.post(selected_workflow, data=execution_arg, verify=False)
-    if alert_json['rule']['id'] == "100002":
-        ncat_fired = True
+    # Ejecución workflow seleccionado en Shuffle
+    requests.post(selected_workflow, json=execution_arg, verify=False)
 
 
-async def main():
-    nc = await nats.connect(servers=[NATS_BROKER])
-    sub = await nc.subscribe(NATS_SUBJECT)
+async def main(handler):
 
-    get_workflows()
-    while True:
+    async def message_handler(msg: Msg):
         try:
-            async for msg in sub.messages:
-                print(f"Received a message on '{msg.subject} {msg.reply}': {msg.data.decode()}")
-                alert_log = msg.data.decode()
-                inicio = datetime.datetime.now()
-                
-                select_workflow(alert_log)
+            print(f'Received a message on "{msg.subject} {msg.reply}"')
+            print(f'Message contents: {msg.data.decode()}')
+            alert_log = msg.data.decode()
 
-                fin = datetime.datetime.now()
-                tiempo = str(fin - inicio)
-                print("TIEMPO ALGORITMO: ", tiempo)
+            inicio = datetime.datetime.now()
+            select_workflow(alert_log)
+            fin = datetime.datetime.now()
+
+            print(f'Mitigation applied in {fin - inicio} seconds')
         except Exception as e:
-          pass
+            print(f'Caught exception ({type(e)}): "{e}"')
+
+    print('Obtaining workflows...')
+    get_workflows()
+    print('Connecting to NATS...')
+    nc = await nats.connect(servers=[NATS_BROKER])
+    print('Subscribing to alerts...')
+    sub = await nc.subscribe(NATS_SUBJECT, cb=message_handler)
+    print('Ready to mitigate')
+    while True:
+        await asyncio.sleep(5)
+        if handler.terminated:
+            break
+    print('Terminating gracefully')
+
+
+class Terminator:
+    terminated = False
+
+    def __init__(self) -> None:
+        signal.signal(signal.SIGINT, self._terminate)
+        signal.signal(signal.SIGTERM, self._terminate)
+
+    def _terminate(self, *_):
+        self.terminated = True
+
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    asyncio.run(main(Terminator()))
