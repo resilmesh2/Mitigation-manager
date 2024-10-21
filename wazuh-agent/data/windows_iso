@@ -1,7 +1,0 @@
-#Start Firewall if not started
-Start-Service MsfwNflt
-
-# Filter all inbound and outbound traffic
-New-NetFirewallRule -Name "FilterInbound" -Direction Inbound -Action Block -Profile Domain,Private,Public
-New-NetFirewallRule -Name "FilterOutbound" -Direction Outbound -Action Block -Profile Domain,Private,Public
-
