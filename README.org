@@ -1,0 +1,109 @@
+#+TITLE: Mitigation Engine
+
+This project contains all the necessary resources to build and deploy the
+Mitigation Engine on the ResilMesh network.
+
+# TODO: Think about turning project into a web server (to be able to query it
+# for details/etc), or if just a NATS relay is fine.
+
+# TODO: Edit the CRUSOE stage to contact the ISIM, use the information to do
+# basic workflow pruning?
+
+# TODO Start shaping up the attack flow part
+
+# TODO An idea I had is that we could build out our own attack graphs based on
+# the network events.  I don't know how much "attack mitigation" this is as
+# opposed to detection/forensics/etc, but it's definitely related to choosing
+# the appropriate mitigations.  I also don't know how useful this'd be, or how
+# feasible (since I don't really have a good idea of what the alert traffic is
+# going to look like), but it's an interesting approach.  For example: say that
+# X attack happens, then Y, and that's followed by Z.  Perhaps X-Y-Z doesn't
+# match any of our predefined attack graphs, but we can store this "mini attack
+# graph" and use it in the future when we detect X-Y to prevent Z in advance.
+
+# TODO Are all alerts received by the Mitigation Manager associated to a MITRE
+# ATT&CK?  If so, the logic is simplified a lot to building and checking against
+# attack graphs, otherwise we might have to think about making our own "attack
+# patterns".
+
+# TODO There's two types of alerts: attacks (i.e. "this malicious file has been
+# downloaded") and attack preconditions (i.e. "This device connected to IP
+# a.b.c.d").  Attacks are what (potentially) trigger an update to the current
+# threat state, attack preconditions are what are used to potentially predict an
+# attack coming in soon.
+
+# TODO Basic mitigation manager flow: 1) Update situation based on SIEM
+# alerts/risk score/etc, 2) If appropriate, begin mitigation selection: 3)
+# Determine mitigation parameters (max mitigation cost, devices to apply
+# mitigation to, etc), 4) Filter out mitigations based on the conditions and 5)
+# Apply the best mitigations from the available ones, or none if there were no
+# good ones.
+
+# TODO Steps 3 and 4 are basically what the solver does, so my direct
+# contribution would be to perhaps update the solver parameters and that's it.
+
+
+* Deployment
+
+The Mitigation Engine is packaged inside a Docker image and deployed using
+Docker Compose.
+
+** Creating the ResilMesh network
+
+All ResilMesh containers run on a special network called =resilmesh_network=.
+This network should be created in advance with the ~docker network create~
+command.  There are several static IPs in use by the project that are dependent
+on the ResilMesh network, so please ensure that the subnet they belong to
+matches the one used by the network.  The default configuration assumes the
+subnet =192.168.200.0/24=.  A network using this subnet can be created using the
+following command.
+
+#+NAME: mitigation-manager-create-network
+#+begin_src sh
+  docker network create --subnet 192.168.200.0/24 --gateway=192.168.200.1 resilmesh_network
+#+end_src
+
+#+RESULTS: mitigation-manager-create-network
+
+** Launching the Mitigation Engine
+
+#+NAME: mitigation-manager-run
+#+begin_src sh
+  docker compose up --build -d
+#+end_src
+
+#+NAME: mitigation-manager-stop
+#+begin_src sh
+  docker compose down --remove-orphans
+#+end_src
+
+* COMMENT Code blocks
+
+** Variables
+
+#+NAME: miitigation-manager-port
+#+begin_src emacs-lisp :cache yes
+  "8333"
+#+end_src
+
+#+RESULTS[9f7b03a3714ec7fd9ea2e346a74ea044c02dbc97]: miitigation-manager-port
+: 8333
+
+** Code blocks
+
+#+NAME: docker-compose-run
+#+begin_src sh :var file="docker-compose.yaml" :results verbatim
+  docker compose -f $file up -d 2>&1
+#+end_src
+
+#+NAME: docker-compose-kill
+#+begin_src sh :var dir="/" :var file="docker-compose.yaml" :results verbatim
+  cd $dir
+
+  docker compose -f $file down --remove-orphans 2>&1
+#+end_src
+
+#+NAME: mitigation-manager-get-version
+#+begin_src verb :wrap src ob-verb-response
+  GET http://localhost:8333/api/version
+#+end_src
