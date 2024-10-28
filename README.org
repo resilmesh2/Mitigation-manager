@@ -3,7 +3,7 @@
 This project contains all the necessary resources to build and deploy the
 Mitigation Engine on the ResilMesh network.
 
-# TODO: Think about turning project into a web server (to be able to query it
+# DONE: Think about turning project into a web server (to be able to query it
 # for details/etc), or if just a NATS relay is fine.
 
 # TODO: Edit the CRUSOE stage to contact the ISIM, use the information to do
@@ -42,6 +42,139 @@ Mitigation Engine on the ResilMesh network.
 # TODO Steps 3 and 4 are basically what the solver does, so my direct
 # contribution would be to perhaps update the solver parameters and that's it.
 
+# TODO There's something to be said about MITRE tactics.  When receiving alerts
+# with MITRE ATT&CK IDs associated with them, we use them to update the current
+# state and build attack graphs.  However, other than by checking against
+# preexisting hand crafted (AI generated?) graphs, there's no real way to tell
+# if MITRE ID A happened because of MITRE ID B, and is thus the next node in a
+# graph.  Tactics are already associated to attacks, and can be used to predict
+# what will happen next.  For example, file permission modification is
+# associated with defense evation.  Tactics are few, so we could reasonably
+# build manual tactic graphs that represent the ordered steps attackers will
+# take.  For example: once an attacker has gained initial access (TA0001), they
+# will almost certainly never do that again, and so any additional alerts
+# corresponding to initial access will most likely come from other attacks and
+# thus require separate attack graphs to be built.
+
+# TODO There could be three types of mitigations: active (regarding the current
+# alert), proactive (regarding the predicted next alert), and reactive
+# (regarding the current alert, but based on the previous alert).  Active
+# mitigations have to be chosen fast so anything AI or MILP related is out of
+# the question - we'll have workflow pruning based on CSA and select the lowest
+# cost one.  Proactive mitigations should be based on the risk score (the
+# riskier the situation, the more likely the attacker will indeed make
+# progress).  Reactive mitigations are MILP solutions for mitigating the
+# predicted next alert deferred to an external process to be solved and then
+# stored in memory.  When receiving the next alert, if the attack ID matches one
+# of the precomputed MILP solutions then the solution is applied - this results
+# in expensive MILP computations being done ahead of time in order to have the
+# fastest response time possible.
+
+* List of abbreviations
+
+- MM :: Mitigation Manager (component)
+- ISIM :: Infrastructure and Service Information Model (component)
+- MILP :: Mixed Integer Lineal Programming
+- CSA :: Cyber Situational Awareness
+
+* Theory
+
+In its most simple form the MM works by managing a local "domain state",
+updating it whenever an alert is received, and iterating through mitigation
+workflows to select the least costly one.  A more complete explanation includes
+the querying of the ISIM to update workflow costs in real time according to the
+current situation, the prediction of potential next alerts based on attacker
+behavior, and the optimized workflow-selection process by modeling the
+requirements as a MILP.
+
+** Domain state
+
+The MM keeps in memory a simplistic representation of the current state of the
+network.  The purpose of this state is to aid in prediction of an attacker's
+most likely next steps.
+
+*** Attack state
+
+The attack space contains a series of zero or more MITRE ATT&CK graphs,
+representing the current perceived attack state of the network.  When the MM
+receives alerts it maps them to potential attack graphs they might belong to,
+gaining more accuracy as more alerts are evaluated.  These attack graphs help
+the MM
+
+*** Tactic space
+
+The tactic space is a set of MITRE Tactics and a percentage assigned to each
+one, determined to be an attacker's most likely next step.  This space starts on
+a uniform distribution between Initial Access/C&C/Recon/Resource Development,
+and evolves over time based on the received alerts.  For example: given an alert
+associated with a TA0001 attack, the tactic space will then reduce the
+probabilities associated with C&C/Recon/Resource Development, drastically reduce
+the probability of Initial Access, and prioritize other tactics such as Lateral
+Movement.  The information offered by the tactic space is used to predict next
+alerts.
+
+** Workflows
+
+The MM maintains a collection of workflows that it can trigger at any moment to
+mitigate all sorts of attacks.  Each workflow requires a series of parameters
+(f.e. target device) which are computed using the current alert, CSA information
+from the ISIM, and the current domain state.  Workflows also include two cost
+values:
+
+- Set cost :: The cost of applying the workflow, regardless of current
+  conditions.
+
+- Variable cost :: The cost of applying a workflow, based on current conditions.
+  For example, disabling a service within a device will incur a cost
+  proportional in part to that service's importance to domain missions.
+  Variable cost is calculated using a series of predefined parameters computed
+  using the ISIM.
+
+Finally, workflows are additionally categorized by their type: either proactive
+(putting measures in place to avoid attacks) or reactive (responding to attacks
+by mitigating their effects).  For example: applying a vulnerability patch to a
+device is categorized as proactive (since this mitigation will only work if the
+vulnerability hasn't been exploited yet), while terminating a malicious process
+is categorized as reactive (the process has been executed already, but the harm
+it might cause can be mitigated by killing it).  The MM is tasked with two jobs:
+calculating the optimal reactive mitigation for a given alert, and preemptively
+applying proactive mitigations targeted at potential next alerts.
+
+** MILP
+
+Multi-objective optimization problems over attack graphs can be transformed into
+MILPs, which can then in turn be solved by MILP libraries with high efficiency.
+If in possession of the attack graph, a MILP can be utilized to calculate the
+optimal mitigation strategy that conforms to any existing cost constraints.  The
+MM will use MILPs to calculate proactive workflows, so long as the attack graph
+is either present or can be deduced using the domain state.
+
+** Risk score integration
+
+The MM receives as information a risk score, used as a representation of how
+much danger the network is currently inferred to be in.  High enough risk scores
+will cause the MM to enforce certain proactive workflows, regardless of the
+current domain state.  For example: if the risk score of a device is too high,
+the MM might attempt to patch known vulnerabilities or restrict network access
+in an attempt to reduce the risk score.  The MM will act based on current CSA,
+with risk score reducing efforts proportional to the "importance" of the
+affected region/s.  For example: if a device is critical for a business mission,
+the risk threshold before the MM starts addressing it will be lower than that of
+a device not critical for any business missions.
+
+* Design
+
+The MM is split into  components, each of which addresses one of the 4 main
+aspects of attack mitigation: maintaining an up-to-date local state, mitigating
+immediate alerts, mitigating attack graphs, and mitigating potential future
+techniques.
+
+** State Manager
+
+The State Manager (SM) is the section of the MM in charge of instanciating and
+maintaining a representation of the current attack state.  This representation
+consists of a series of MITRE ATT&CK graphs, represented using a set of doubly
+linked action nodes
 
 * Deployment
 
@@ -77,17 +210,194 @@ following command.
   docker compose down --remove-orphans
 #+end_src
 
-* COMMENT Code blocks
+* Babel
 
 ** Variables
 
-#+NAME: miitigation-manager-port
+#+NAME: mitigation-manager-port
 #+begin_src emacs-lisp :cache yes
   "8333"
 #+end_src
 
-#+RESULTS[9f7b03a3714ec7fd9ea2e346a74ea044c02dbc97]: miitigation-manager-port
+#+RESULTS[9f7b03a3714ec7fd9ea2e346a74ea044c02dbc97]: mitigation-manager-port
 : 8333
+
+#+NAME: example-rule-100002
+#+begin_src python :session :results verbatim
+  """
+  {
+    "timestamp": "2024-10-22T09:31:15.007+0000",
+    "rule": {
+      "level": 14,
+      "description": "Connection via ncat from source port 11234 to 192.168.200.1:36210. PID: 3613",
+      "id": "100002",
+      "mitre": {
+        "id": [
+          "T1041",
+          "T1219"
+        ],
+        "tactic": [
+          "Exfiltration",
+          "Command and Control"
+        ],
+        "technique": [
+          "Exfiltration Over C2 Channel",
+          "Remote Access Software"
+        ]
+      },
+      "firedtimes": 1,
+      "mail": true,
+      "groups": [
+        "established_conn"
+      ]
+    },
+    "agent": {
+      "id": "001",
+      "name": "eeb0036baf28",
+      "ip": "192.168.200.200"
+    },
+    "manager": {
+      "name": "wazuh.manager"
+    },
+    "id": "1729589475.25117",
+    "full_log": "ncat 3613 848a20e98d52:11234->192.168.200.1:36210",
+    "decoder": {
+      "name": "lsof_ncat_decoder"
+    },
+    "data": {
+      "pid": "3613",
+      "src_port": "11234",
+      "dst_ip": "192.168.200.1",
+      "dst_port": "36210"
+    },
+    "location": "command_ncat_conn"
+  }
+  """
+#+end_src
+
+#+NAME: example-rule-100003
+#+begin_src python :session :results verbatim
+  """
+  {
+    "timestamp": "2024-10-22T09:18:46.153+0000",
+    "rule": {
+      "level": 8,
+      "description": "Execute permission added to python script.",
+      "id": "100003",
+      "mitre": {
+        "id": [
+          "T1222.002"
+        ],
+        "tactic": [
+          "Defense Evasion"
+        ],
+        "technique": [
+          "Linux and Mac File and Directory Permissions Modification"
+        ]
+      },
+      "firedtimes": 4,
+      "mail": false,
+      "groups": [
+        "syscheck"
+      ]
+    },
+    "agent": {
+      "id": "001",
+      "name": "eeb0036baf28",
+      "ip": "192.168.200.200"
+    },
+    "manager": {
+      "name": "wazuh.manager"
+    },
+    "id": "1729588726.22091",
+    "full_log": "File '/tmp/zerologon_tester.py' modified\nMode: realtime\nChanged attributes: permission\nPermissions changed from 'rw-r--r--' to 'rwxr-xr-x'\n",
+    "syscheck": {
+      "path": "/tmp/zerologon_tester.py",
+      "mode": "realtime",
+      "size_after": "3041",
+      "perm_before": "rw-r--r--",
+      "perm_after": "rwxr-xr-x",
+      "uid_after": "0",
+      "gid_after": "0",
+      "md5_after": "0008432c27c43f9fe58e9bf191f9c6cf",
+      "sha1_after": "84dc56d99268f70619532536f8445f56609547c7",
+      "sha256_after": "b8ae48c2e46c28f1004e006348af557c7d912036b9ead88be67bca2bafde01d3",
+      "uname_after": "root",
+      "gname_after": "root",
+      "mtime_after": "2024-10-22T09:16:02",
+      "inode_after": 151477998,
+      "changed_attributes": [
+        "permission"
+      ],
+      "event": "modified"
+    },
+    "decoder": {
+      "name": "syscheck_integrity_changed"
+    },
+    "location": "syscheck"
+  }
+  """
+#+end_src
+
+#+NAME: example-rule-100004
+#+begin_src python :session :results verbatim
+  """
+  {
+    "timestamp": "2024-10-22T09:25:39.991+0000",
+    "rule": {
+      "level": 8,
+      "description": "Executable file added to filesystem",
+      "id": "100004",
+      "mitre": {
+        "id": [
+          "T1204.002"
+        ],
+        "tactic": [
+          "Execution"
+        ],
+        "technique": [
+          "Malicious File"
+        ]
+      },
+      "firedtimes": 8,
+      "mail": false,
+      "groups": [
+        "filesystem"
+      ]
+    },
+    "agent": {
+      "id": "001",
+      "name": "eeb0036baf28",
+      "ip": "192.168.200.200"
+    },
+    "manager": {
+      "name": "wazuh.manager"
+    },
+    "id": "1729589139.24598",
+    "full_log": "File '/tmp/zerologon_tester.py' added\nMode: realtime\n",
+    "syscheck": {
+      "path": "/tmp/zerologon_tester.py",
+      "mode": "realtime",
+      "size_after": "3041",
+      "perm_after": "rw-r--r--",
+      "uid_after": "0",
+      "gid_after": "0",
+      "md5_after": "0008432c27c43f9fe58e9bf191f9c6cf",
+      "sha1_after": "84dc56d99268f70619532536f8445f56609547c7",
+      "sha256_after": "b8ae48c2e46c28f1004e006348af557c7d912036b9ead88be67bca2bafde01d3",
+      "uname_after": "root",
+      "gname_after": "root",
+      "mtime_after": "2024-10-22T09:25:39",
+      "inode_after": 151477998,
+      "event": "added"
+    },
+    "decoder": {
+      "name": "syscheck_new_entry"
+    },
+    "location": "syscheck"
+  }
+  """
+#+end_src
 
 ** Code blocks
 
@@ -105,5 +415,29 @@ following command.
 
 #+NAME: mitigation-manager-get-version
 #+begin_src verb :wrap src ob-verb-response
-  GET http://localhost:8333/api/version
+  GET http://localhost:{{(org-sbe mitigation-manager-port)}}/api/version
+#+end_src
+
+#+NAME: mitigation-manager-handle-ncat-connection
+#+begin_src verb :wrap src ob-verb-response
+  POST http://localhost:{{(org-sbe mitigation-manager-port)}}/api/alert
+  Content-Type: application/json
+
+  {{(org-sbe example-rule-100002)}}
+#+end_src
+
+#+NAME: mitigation-manager-handle-execution-permissions-added
+#+begin_src verb :wrap src ob-verb-response
+  POST http://localhost:{{(org-sbe mitigation-manager-port)}}/api/alert
+  Content-Type: application/json
+
+  {{(org-sbe example-rule-100003)}}
+#+end_src
+
+#+NAME: mitigation-manager-handle-executable-added
+#+begin_src verb :wrap src ob-verb-response
+  POST http://localhost:{{(org-sbe mitigation-manager-port)}}/api/alert
+  Content-Type: application/json
+
+  {{(org-sbe example-rule-100004)}}
 #+end_src
