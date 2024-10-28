@@ -1,6 +1,6 @@
 import asyncio
 
-from manager import solver, state, workflow
+from manager import solver, state, workflows
 from manager.config import log
 
 async def handle_alert(alert: dict):
@@ -11,13 +11,17 @@ async def handle_alert(alert: dict):
 
         # Step 2: if applicable, start mitigation process
         if await state.mitigations_needed():
-            wf = await solver.find_mitigation()
-            results = await workflow.execute(wf)
-            if workflow.successful(results):
-                log.info('Mitigation applied successfully')
+            log.info('Mitigation required, resolving workflows')
+            wf = await solver.find_workflow()
+            log.info('Applying workflows')
+            results = await workflows.execute(wf)
+            if workflows.successful(results):
+                log.info('Workflows applied successfully')
             else:
-                log.warning('Unable to apply mitigation')
-                log.warning(workflow.error(wf))
+                log.warning('Unable to apply workflows')
+                log.warning(workflows.error(wf))
+        else:
+            log.info('No mitigation required')
     except asyncio.CancelledError:
         log.info('Alert handling cancelled')
         return

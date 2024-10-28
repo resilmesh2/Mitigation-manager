@@ -1,6 +1,9 @@
-from sanic import Blueprint, json, HTTPResponse
+from datetime import datetime
 
-from manager.config import version
+from sanic import Blueprint, HTTPResponse, Request, json, empty
+
+from manager.config import log, version
+from manager.tasks import handle_alert
 
 bp_manager = Blueprint('manager')
 bg_manager = Blueprint.group(bp_manager)
@@ -46,3 +49,13 @@ def version_endpoint(*_) -> HTTPResponse:
         'major': int(version.split('.')[0]),
         'minor': int(version.split('.')[1]),
     })
+
+
+@bp_manager.post('/alert')
+async def post_alert(request: Request):
+    alert = request.json
+    log.info('Received new alert')
+    if 'rule' in alert:
+        log.debug(alert['rule']['description'])
+    await handle_alert(alert)
+    return empty(200)

@@ -1,9 +1,7 @@
+from manager import state, workflows
 
 
-from manager import state
-
-
-async def find_mitigation() -> dict:
+async def find_workflow() -> dict:
     # TLDR: obtain mitigation preconditions, feed them to the solver,
     # translate the results to a specific mitigation description dict
     # and return that.
@@ -27,7 +25,7 @@ async def find_mitigation() -> dict:
     # Find the first workflow that can mitigate *all* of the attacks
     # TODO: if none can, run two workflows that get the same thing
     # done.
-    for workflow in await state.get_workflows():
+    for workflow in await workflows.get():
         if all(id in workflow['attacks'] for id in attacks):
             return workflow
 

@@ -7,8 +7,15 @@ name = "pypi"
 nats-py = "*"
 sanic = {extras = ["ext"], version = "*"}
 aiohttp = "*"
+aiosqlite = "*"
+neo4j = "*"
 
 [dev-packages]
+pytest = "*"
 
 [requires]
 python_version = "3.11"
+
+[scripts]
+dev = "sanic manager.server:manager --port 8333 --dev --reload"
+tests = "pytest test -s"

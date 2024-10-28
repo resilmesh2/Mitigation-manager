@@ -1,10 +1,54 @@
-current_alert: dict = {}
+from __future__ import annotations
+from asyncio import gather
+from typing import Coroutine
 
+from aiosqlite import Cursor
+
+from manager.model.state_manager import AttackNode
+
+async def _retrieve_state() -> list[AttackNode]:
+    return []
+
+
+async def _retrieve_potential_graphs(technique: str) -> list[AttackNode]:
+    """Returns a list of potential new attack flows."""
+    return []
+
+
+async def _update_state(prev: AttackNode, next: AttackNode):
+    pass
+
+
+async def _update_probabilities(nodes: list[AttackNode]):
+    pass
+
+
+
+# TLDR: check MITRE IDs, see which attacks have taken place, see
+# which preconditions have taken place, update DB based on it.
 async def update(alert: dict):
-    # TLDR: check MITRE IDs, see which attacks have taken place, see
-    # which preconditions have taken place, update DB based on it.
-    global current_alert
-    current_alert = alert
+    state = await _retrieve_state()
+
+    # 1: Advance local state if necessary.  Run everything in parallel
+    # for efficiency.
+    tasks: list[Coroutine] = []
+    for node in state:
+        next = node.next_attack()
+        if next is None:
+            # ????
+            break
+        if alert['rule']['id'] == next.technique:
+            tasks.append(_update_state(node, next))
+
+    # 2: Update probability percentages.
+    all_nodes = set([n for node in state for n in node.all_attack_nodes()])
+    tasks.append(_update_probabilities([n for n in all_nodes if n.update_probability(alert)]))
+
+    # Run all updates
+    await gather(*tasks)
+
+
+
 
 
 async def mitigations_needed() -> bool:
@@ -13,32 +57,3 @@ async def mitigations_needed() -> bool:
     # incurring the next state, combine it with the risk score(?), and
     # evaluate against the configured risk threshold.
     return True
-
-
-async def get_mitigation_preconditions() -> dict:
-    # TLDR: based on the current state, get a series of preconditions
-    # to feed to the solver.
-    global current_alert
-    return {
-        'mitre_id': current_alert['rule']['id']
-    }
-
-
-async def get_workflows() -> list[dict]:
-    return [
-        {
-            'name': 'delete_file',
-            'webhook': '6b219a4d-9723-4607-b6c6-6e56f790650c',
-            'attacks': ['T1222.002', 'T1204.002']
-        },
-        {
-            'name': 'close_conn',
-            'webhook': 'aa2e31ea-dd3e-4471-ad4e-3f032bdb381d',
-            'attacks': ['T1041', 'T1219']
-        },
-        {
-            'name': 'handle_ransomware',
-            'webhook': '1d5366eb-8006-45a3-8fff-e764c283b811',
-            'attacks': ['T1204.002']
-        }
-    ]
