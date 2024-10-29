@@ -1,10 +1,15 @@
 from __future__ import annotations
+
 from asyncio import gather
-from typing import Coroutine
+from typing import TYPE_CHECKING
 
-from aiosqlite import Cursor
+from manager import config
 
-from manager.model.state_manager import AttackNode
+if TYPE_CHECKING:
+    from collections.abc import Coroutine
+
+    from manager.model.state_manager import AttackNode
+
 
 async def _retrieve_state() -> list[AttackNode]:
     """Return the list of current attack graphs.
@@ -32,37 +37,57 @@ async def _update_probabilities(nodes: list[AttackNode]):
     """Update the probabilities of a list of nodes."""
 
 
+async def update(alert: dict) -> tuple[list[AttackNode], list[AttackNode], list[AttackNode]]:
+    """Update the local state with an alert.
 
-# TLDR: check MITRE IDs, see which attacks have taken place, see
-# which preconditions have taken place, update DB based on it.
-async def update(alert: dict):
+    Return 3 lists of nodes that should be mitigated:
+    - Nodes previously executed in the attack graphs.
+    - Nodes immediately related by the alert.
+    - Nodes further along in the active attack graphs.
+    """
     state = await _retrieve_state()
-
-    # 1: Advance local state if necessary.  Run everything in parallel
-    # for efficiency.
     tasks: list[Coroutine] = []
+
+    new_state: list[AttackNode] = []
+    old_state: list[AttackNode] = []
+
+    past: list[AttackNode] = []
+    present: list[AttackNode] = []
+    future: list[AttackNode] = []
+    # 1: Advance local state if necessary.
     for node in state:
-        next = node.next_attack()
-        if next is None:
-            # ????
-            break
-        if alert['rule']['id'] == next.technique:
-            tasks.append(_update_state(node, next))
+        _next = node.next_attack()
+        if _next is None:
+            # Attack finished, but we might want to mitigate the
+            # attack tree.  Keep it for now.
+            continue
+        if alert['rule']['id'] == _next.technique:
+            tasks.append(_update_state(node, _next))
+            new_state.append(_next)
+            old_state.append(node)
 
     # 2: Update probability percentages.
-    all_nodes = set([n for node in state for n in node.all_attack_nodes()])
+    all_nodes = {n for node in state for n in node.all_attack_nodes()}
     tasks.append(_update_probabilities([n for n in all_nodes if n.update_probability(alert)]))
 
-    # Run all updates
+    # Run all DB updates
     await gather(*tasks)
 
+    # Update local state
+    (state.remove(n) for n in old_state)
+    state.extend(new_state)
 
+    for node in state:
+        # Past: judge based on risk history
+        for n in node.all_before():
+            if n.historically_risky():
+                past.append(n)
+        # Present: only if it was related to this alert
+        if alert['rule']['id'] == node.technique:
+            present.append(node)
+        # Future: judge based on how likely it is
+        for n in node.all_after():
+            if n.probability > config.PROBABILITY_TRESHOLD:
+                future.append(n)
 
-
-
-async def mitigations_needed() -> bool:
-    # TLDR: check if based on the current state the probability of
-    # going to the next state is high, combine it with the cost of
-    # incurring the next state, combine it with the risk score(?), and
-    # evaluate against the configured risk threshold.
-    return True
+    return (past, present, future)
