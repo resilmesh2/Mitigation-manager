@@ -220,7 +220,7 @@ following command.
   docker compose down --remove-orphans
 #+end_src
 
-* Babel
+* COMMENT Babel
 
 ** Variables
 
