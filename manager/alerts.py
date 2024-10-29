@@ -1,8 +1,6 @@
-from typing import TYPE_CHECKING
 from manager.config import log
+from typing import Any
 
-if TYPE_CHECKING:
-    from typing import Any
 
 def mitre_identifiers(alert: dict) -> list[str] | None:
     try:

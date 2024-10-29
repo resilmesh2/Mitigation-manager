@@ -69,7 +69,7 @@ async def get() -> list[dict]:
             'prevents': ['T1222.002'],
             'set_cost': 1,
             'variable_cost': {
-                '': 0
+                '': 0,
             },
         },
         {
@@ -90,5 +90,5 @@ async def get() -> list[dict]:
             'webhook': None,
             'attacks': ['T1041, T1219'],
             'set_cost': 5,
-        }
+        },
     ]

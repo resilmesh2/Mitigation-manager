@@ -6,29 +6,30 @@ from manager import config
 from manager.model.conditions import Condition
 
 class Node:
-    def __init__(self, prev: Node | None, next: Node | None) -> None:
+    def __init__(self, _prev: Node | None, _next: Node | None) -> None:
         self.id = uuid4()
-        self._prev = prev
-        self._next = next
+        self.prv = _prev
+        self.nxt = _next
 
     def first(self) -> Node:
         ret = self
-        while ret._prev is not None:
-            ret = ret._prev
+        while ret.prv is not None:
+            ret = ret.prv
         return ret
 
     def last(self) -> Node:
         ret = self
-        while ret._next is not None:
-            ret = ret._next
+        while ret.nxt is not None:
+            ret = ret.nxt
         return ret
 
-    def then(self, type: type[Node], *args, **kwargs) -> Node:
-        tmp = type.__new__(type)
+    def then(self, _type: type[Node], *args, **kwargs) -> Node:
+        tmp = _type.__new__(_type)
         tmp.__init__(*args, **kwargs)
-        tmp._prev = self
-        self._next = tmp
+        tmp.prv = self
+        self.nxt = tmp
         return tmp
+
 
 class AttackNode(Node):
     """Represents a MITRE tactic."""
@@ -50,7 +51,6 @@ class AttackNode(Node):
         the more likely it is to continue progressing).  This factor
         follows a quadratic curve.
         """
-
         exp = (1 - graph_interest) * 4 + 1
         return (len(self.all_before()) / (len(self.all_before()) + len(self.all_after()))) ** exp
 
@@ -63,36 +63,38 @@ class AttackNode(Node):
         attack graph (read as: the less preconditions an attack has in
         total, the easier it is to do).
         """
-
         return sum([len(n.conditions) for n in self.all_before()] +
                    [len(n.conditions) for n in self.all_after()] +
                    [len(self.conditions)]) / max_conditions * ease_impact
 
     def next_attack(self) -> AttackNode | None:
-        tmp = self._next
+        tmp = self.nxt
         while tmp is not None and type(tmp) is not AttackNode:
-            tmp = tmp._next
+            tmp = tmp.nxt
         return tmp
 
     def all_attack_nodes(self) -> set[AttackNode]:
         if self._cache_flat_map is not None:
             return self._cache_flat_map
         ret: set[AttackNode] = set()
-        b = self._prev
+        b = self.prv
         while b is not None:
             if type(b) is AttackNode:
                 ret.add(b)
-                b = b._prev
-        a = self._next
+                b = b.prv
+        a = self.nxt
         while a is not None:
             if type(a) is AttackNode:
                 ret.add(a)
-                a = a._next
+                a = a.nxt
         self._cache_flat_map = ret
         return ret
 
-    async def update_probability(self, alert: dict, epsilon: float = config.PROBABILITY_EPSILON) -> bool:
-        """Recalculates the probability of this node being executed."""
+    async def update_probability(self,
+                                 alert: dict,
+                                 epsilon: float = config.PROBABILITY_EPSILON,
+                                 ) -> bool:
+        """Recalculates the probability of the node being executed."""
         # Factor 3 is proportional to how many conditions have been
         # met.
         factor_3 = [await c.check(alert) for c in self.conditions].count(True) / len(self.conditions)
@@ -105,11 +107,11 @@ class AttackNode(Node):
         if self._cache_all_before is not None:
             return self._cache_all_before
         ret = []
-        tmp = self._prev
+        tmp = self.prv
         while tmp is not None:
             if type(tmp) is AttackNode:
                 ret.append(tmp)
-                tmp = tmp._prev
+                tmp = tmp.prv
         self._cache_all_before = ret
         return ret
 
@@ -117,10 +119,10 @@ class AttackNode(Node):
         if self._cache_all_after is not None:
             return self._cache_all_after
         ret = []
-        tmp = self._next
+        tmp = self.nxt
         while tmp is not None:
             if type(tmp) is AttackNode:
                 ret.append(tmp)
-                tmp = tmp._next
+                tmp = tmp.nxt
         self._cache_all_after = ret
         return ret

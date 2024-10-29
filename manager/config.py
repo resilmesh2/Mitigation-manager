@@ -25,6 +25,7 @@ def set_config(app: Sanic):
     global ENV
     ENV = app.config
 
+
 def update_config(env: dict):
     global ENV
     if ENV is None:
@@ -35,9 +36,10 @@ def update_config(env: dict):
 def getenv(key: str, optional: bool = False) -> str:
     global ENV
     if ENV is None:
-        raise ValueError('Environment was not initialized')
+        msg = 'Environment was not initialized'
+        raise ValueError(msg)
     var = ENV[key]
-    if var is None or var == '':
-        if not optional:
-            raise ValueError(f'Missing environment variable "{key}"')
+    if (var is None or var == '') and not optional:
+        msg = f'Missing environment variable "{key}"'
+        raise ValueError(msg)
     return var
