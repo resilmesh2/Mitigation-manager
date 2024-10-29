@@ -7,20 +7,29 @@ from aiosqlite import Cursor
 from manager.model.state_manager import AttackNode
 
 async def _retrieve_state() -> list[AttackNode]:
-    return []
+    """Return the list of current attack graphs.
+
+    The graphs are represented as a list of the last fulfilled attack
+    nodes, each linked to the previous/next nodes to form the attack
+    graph.
+    """
 
 
 async def _retrieve_potential_graphs(technique: str) -> list[AttackNode]:
-    """Returns a list of potential new attack flows."""
-    return []
+    """Return a list of potential new attack graphs.
+
+    The return structure is the same as in _retrieve_state(), but
+    representing instead the already fulfilled attack nodes of attack
+    graphs not considered before.
+    """
 
 
 async def _update_state(prev: AttackNode, next: AttackNode):
-    pass
+    """Update the new latest node in an attack graph."""
 
 
 async def _update_probabilities(nodes: list[AttackNode]):
-    pass
+    """Update the probabilities of a list of nodes."""
 
 
 
