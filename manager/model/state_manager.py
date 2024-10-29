@@ -1,9 +1,15 @@
 from __future__ import annotations
-from uuid import uuid4
+
+from functools import reduce
 from math import fabs
+from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from manager import config
-from manager.model.conditions import Condition
+
+if TYPE_CHECKING:
+    from manager.model.conditions import Condition
+
 
 class Node:
     def __init__(self, _prev: Node | None, _next: Node | None) -> None:
@@ -33,11 +39,19 @@ class Node:
 
 class AttackNode(Node):
     """Represents a MITRE tactic."""
-    def __init__(self, technique: str, conditions: list[Condition], *, prev: Node | None = None, next: Node | None = None) -> None:
-        super().__init__(prev, next)
+
+    def __init__(self,
+                 technique: str,
+                 conditions: list[Condition],
+                 probability_history: list[float],
+                 *,
+                 _prev: Node | None = None,
+                 _next: Node | None = None) -> None:
+        super().__init__(_prev, _next)
         self.technique = technique
         self.conditions = conditions
-        self.probability = 0.0
+        self.probability_history = probability_history
+        self.probability = probability_history[-1]
 
         self._cache_flat_map = None
         self._cache_all_before = None
@@ -99,9 +113,18 @@ class AttackNode(Node):
         # met.
         factor_3 = [await c.check(alert) for c in self.conditions].count(True) / len(self.conditions)
 
-        old = self._probability
-        self._probability = self._factor_1() * self._factor_2() * factor_3
-        return False if fabs(self._probability - old) < epsilon else True
+        old = self.probability
+        new = self._factor_1() * self._factor_2() * factor_3
+        if fabs(self.probability - old) < epsilon:
+            return False
+        self.probability_history.append(old)
+        self.probability = new
+        return True
+
+    def historically_risky(self) -> float:
+        """Check if the node has been generally too risky."""
+        risk = reduce(lambda a, b: a + b, self.probability_history) / len(self.probability_history)
+        return risk > config.PROBABILITY_TRESHOLD
 
     def all_before(self) -> list[AttackNode]:
         if self._cache_all_before is not None:
