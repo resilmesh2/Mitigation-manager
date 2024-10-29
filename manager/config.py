@@ -19,7 +19,12 @@ GRAPH_INTEREST = 0.5
 EASE_IMPACT = 0.3
 
 # The minimum change in probability for the database to update.
-PROBABILITY_EPSILON=0.0001
+PROBABILITY_EPSILON = 0.0001
+
+# The minimum probability for a future node to be considered as
+# "requires mitigation".
+PROBABILITY_TRESHOLD = 0.75
+
 
 def set_config(app: Sanic):
     global ENV
