@@ -5,30 +5,27 @@ from manager.config import getenv, log
 
 def validate(workflow: dict) -> bool:
     fields = ['webhook', 'name', 'performs', 'mitigates', 'prevents', 'set_cost', 'variable_cost']
-    if any(f not in workflow for f in fields):
-        return False
+    return not any(f not in workflow for f in fields)
 
-    return True
 
 async def execute(workflow: dict) -> dict:
     # TLDR: call whatever endpoint to run the workflow with the
     # specified parameters, then return a dict containing whether the
     # workflow was successful or not.
     workflow_url = f'http://{getenv("SHUFFLE_HOST")}:{getenv("SHUFFLE_PORT")}/api/v1/hooks/webhook_{workflow["webhook"]}'
-    async with ClientSession() as client:
-        async with client.get(workflow_url) as response:
-            if response.status == 200:
-                return {
-                    'success': True
-                }
-            else:
-                log.debug('Workflow request failed with status code %s', response.status)
-                log.debug(await response.text())
-                return {
-                    'success': False,
-                    'status': response.status,
-                    'body': await response.text()
-                }
+    async with ClientSession() as client, client.get(workflow_url) as response:
+        if response.status == 200:
+            return {
+                'success': True,
+            }
+        log.debug('Workflow request failed with status code %s', response.status)
+        log.debug(await response.text())
+        return {
+            'success': False,
+            'status': response.status,
+            'body': await response.text(),
+        }
+
 
 def successful(results: dict) -> bool:
     # TLDR: check whether the results say that the workflow executed
