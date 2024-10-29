@@ -1,6 +1,7 @@
 from aiohttp import ClientSession
 
 from manager.config import getenv, log
+from manager.model.state_manager import AttackNode
 
 
 def validate(workflow: dict) -> bool:
@@ -37,6 +38,12 @@ def error(results: dict) -> str:
     # TLDR: return a formatted string with debug info on why the
     # workflow failed.
     return f'HTTP status code {results["status"]}'
+
+
+async def locate(node: AttackNode) -> dict | None:
+    """Retrieve the optimal workflow to mitigate an attack."""
+    return []
+
 
 # Scope: the level at which the workflow operates.  The higher the
 # scope is, the more effective and disruptive the mitigation usually
