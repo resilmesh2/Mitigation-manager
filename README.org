@@ -174,7 +174,17 @@ techniques.
 The State Manager (SM) is the section of the MM in charge of instanciating and
 maintaining a representation of the current attack state.  This representation
 consists of a series of MITRE ATT&CK graphs, represented using a set of doubly
-linked action nodes
+linked action nodes.
+
+When receiving an alert, the MM first requests an update of the local state.
+This update process advances any attack graph progress and recalculates attack
+node probabilities based on the alert being processed.  After this update, the
+SM then calculates a list of attack nodes that should be mitigated.  The nodes
+in this list are not only directly related to the received alert, but also those
+that have been considered as very likely to happen in the near future, as well
+as nodes that have a history of being very likely to be exploited.  This list of
+nodes, thus, contains an overview of the actions that should be taken to
+mitigate any current threats and return the network into a lower state of risk.
 
 * Deployment
 
