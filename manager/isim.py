@@ -1,5 +1,6 @@
 from typing import LiteralString
-from neo4j import AsyncDriver, Query
+from typing_extensions import Callable
+from neo4j import AsyncDriver, Query, Record
 
 DRIVER: AsyncDriver | None = None
 
@@ -14,7 +15,8 @@ def get_driver() -> AsyncDriver:
     return DRIVER
 
 
-async def find_any(query: LiteralString, parameters: dict) -> bool:
+async def check_condition(query: LiteralString,
+                          parameters: dict,
+                          condition: Callable[[list[Record], dict], bool]):
     res = await get_driver().execute_query(Query(query), parameters)
-    # TODO this might not do what I think it does
-    return len(res.records) > 0
+    return condition(res.records, parameters)

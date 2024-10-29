@@ -1,62 +1,65 @@
-from typing import Any
+from collections.abc import Callable
+from typing import Any, LiteralString
 
-from manager import isim
+from neo4j import Record
+
+from manager.isim import check_condition
 
 
 class Condition:
     """Represents a condition."""
-    def __init__(self, data: dict) -> None:
-        self.data = data
 
-    def get(self, key: str) -> Any:
-        return None if key not in self.data else self.data[key]
+    def __init__(self, params: dict[str, Any],
+                 args: dict[str, str | list[str]],
+                 query: LiteralString,
+                 check_function: Callable[[list[Record], dict], bool]) -> None:
+        self.params = params
+        self.args = args
+        self.query: LiteralString = query
+        self.check_function = check_function
 
-    async def check(self, alert: dict) -> bool:
-        """Queries the ISIM and checks whether the condition is true."""
-        # For now, follow the example class below: run a query that
-        # either returns something (matches) or nothing (doesn't
-        # match)
-        parameters = {}
-        for key, value in self.data['args'].values():
-            if key in parameters:
+    def parameters(self, alert: dict) -> dict | None:
+        ret = {}
+        for key, value in self.args.items():
+            if key in ret:
                 continue
             if type(value) is str:
                 if value in alert:
-                    parameters[key] = alert[value]
+                    ret[key] = alert[value]
                 else:
-                    # If the alert doesn't have the query field, then
-                    # the condition isn't fulfilled.
-                    return False
+                    # If the alert doesn't have the required query
+                    # field, abort
+                    return None
             if type(value) is list:
                 for v in value:
                     if v in alert:
-                        parameters[key] = alert[v]
+                        ret[key] = alert[v]
                         break
-                if key not in parameters:
+                if key not in ret:
                     # If the alert doesn't have at least one of the
-                    # required query fields, then the condition isn't
-                    # fulfilled.
-                    return False
-        parameters |= self.data['params']
-        return await isim.find_any(self.data['query'], parameters)
+                    # optional query fields, abort
+                    return None
+        return self.params | ret
+
+    async def check(self, alert: dict) -> bool:
+        """Query the ISIM and check whether the condition is true."""
+        p = self.parameters(alert)
+        # If not all parameters are available, the condition isn't
+        # fulfilled.
+        if p is None:
+            return False
+        return await check_condition(self.query, p, self.check_function)
 
 
-
-class VulnerabilityCondition(Condition):
-    def __init__(self, vulnerability_identifier: str) -> None:
-        super().__init__({
-            'params': {
-                'vid': vulnerability_identifier,
-            },
-            'args': {
-                'ip_address': 'agent.ip',
-                'example_any': [
-                    'vulnerability',
-                    'vuln',
-                ],
-            },
-            'query': 'MATCH (d:Device)-->(v:Vulnerability)\n'
-            'WHERE d.address = \'$ip_address\'\n'
-            'AND v.id = \'$vid\'\n'
-            'RETURN d.ip, v.id',
-        })
+class CVECondition(Condition):
+    def __init__(self, cve_identifier: str) -> None:
+        super().__init__(
+            params={'cve_id': cve_identifier},
+            args={'ip_address': 'agent.ip'},
+            query='MATCH (ip:IP)<-[:HAS_ASSIGNED]-(:Node)'
+            '-[:IS_A]-(:Host)<-[:ON]-(:SoftwareVersion)<-[:IN]-'
+            '(:Vulnerability)-[:REFERS_TO]->(cve:CVE {CVE_id: $cve_id})\n'
+            'RETURN ip.address as ip_address',
+            check_function=lambda records, parameters:
+            any(parameters['ip_address'] == r.get('ip_address') for r in records),
+        )
