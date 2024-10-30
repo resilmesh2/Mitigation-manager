@@ -1,11 +1,11 @@
 from aiohttp import ClientSession
 
 from manager.config import getenv, log
-from manager.model.state_manager import AttackNode
+from manager.model import AttackNode
 
 
 def validate(workflow: dict) -> bool:
-    fields = ['webhook', 'name', 'performs', 'mitigates', 'prevents', 'set_cost', 'variable_cost']
+    fields = ['webhook', 'name', 'performs', 'mitigates', 'set_cost', 'variable_cost']
     return not any(f not in workflow for f in fields)
 
 
@@ -42,27 +42,9 @@ def error(results: dict) -> str:
 
 async def locate(node: AttackNode) -> dict | None:
     """Retrieve the optimal workflow to mitigate an attack."""
-    return []
+    return {}
 
 
-# Scope: the level at which the workflow operates.  The higher the
-# scope is, the more effective and disruptive the mitigation usually
-# is.
-#
-# - Resource level :: Impacts only files/folders.  Some of these might
-# - be mission-critical for certain processes, but in general the
-# - mitigations will have low impact.
-#
-# - Process level :: Impacts process execution.
-#
-# - Device level :: Impacts the device where the alert was received.
-# - Mitigations belonging to this level can include changes to the
-# - network, so long as they don't impact the execution of other
-# - devices (f.e. by restricting specific outbound trafic).
-#
-# - Network level :: Impacts the subnet/s the device belongs to.
-#
-# - Global level :: Impacts all devices managed by the MIT-MAN.
 async def get() -> list[dict]:
     return [
         {
@@ -70,11 +52,7 @@ async def get() -> list[dict]:
             'webhook': '6b219a4d-9723-4607-b6c6-6e56f790650c',
             'performs': ['D3-FEV'],
             'mitigates': ['T1204.002'],
-            'prevents': ['T1222.002'],
             'set_cost': 1,
-            'variable_cost': {
-                '': 0,
-            },
         },
         {
             'name': 'close_conn',

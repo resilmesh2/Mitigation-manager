@@ -8,7 +8,7 @@ from manager import config
 if TYPE_CHECKING:
     from collections.abc import Coroutine
 
-    from manager.model.state_manager import AttackNode
+    from manager.model import Alert, AttackNode
 
 
 async def _retrieve_state() -> list[AttackNode]:
@@ -18,6 +18,7 @@ async def _retrieve_state() -> list[AttackNode]:
     nodes, each linked to the previous/next nodes to form the attack
     graph.
     """
+    return []
 
 
 async def _retrieve_potential_graphs(technique: str) -> list[AttackNode]:
@@ -27,17 +28,18 @@ async def _retrieve_potential_graphs(technique: str) -> list[AttackNode]:
     representing instead the already fulfilled attack nodes of attack
     graphs not considered before.
     """
+    return []
 
 
-async def _update_state(prev: AttackNode, next: AttackNode):
+async def _update_state(_prev: AttackNode, _next: AttackNode):
     """Update the new latest node in an attack graph."""
 
 
-async def _update_probabilities(nodes: list[AttackNode]):
+async def _update_probabilities(_nodes: list[AttackNode]):
     """Update the probabilities of a list of nodes."""
 
 
-async def update(alert: dict) -> tuple[list[AttackNode], list[AttackNode], list[AttackNode]]:
+async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list[AttackNode]]:
     """Update the local state with an alert.
 
     Return 3 lists of nodes that should be mitigated:
@@ -61,7 +63,7 @@ async def update(alert: dict) -> tuple[list[AttackNode], list[AttackNode], list[
             # Attack finished, but we might want to mitigate the
             # attack tree.  Keep it for now.
             continue
-        if alert['rule']['id'] == _next.technique:
+        if alert.rule_id == _next.technique:
             tasks.append(_update_state(node, _next))
             new_state.append(_next)
             old_state.append(node)
@@ -83,7 +85,7 @@ async def update(alert: dict) -> tuple[list[AttackNode], list[AttackNode], list[
             if n.historically_risky():
                 past.append(n)
         # Present: only if it was related to this alert
-        if alert['rule']['id'] == node.technique:
+        if alert.rule_id == node.technique:
             present.append(node)
         # Future: judge based on how likely it is
         for n in node.all_after():

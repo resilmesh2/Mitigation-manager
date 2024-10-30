@@ -1,5 +1,6 @@
 from json import loads
 
+import aiosqlite
 import nats
 from nats.aio.msg import Msg
 from neo4j import AsyncGraphDatabase
@@ -34,13 +35,22 @@ async def shutdown_nats(app: Sanic):  # noqa: D103
 
 def initialize_neo4j(app: Sanic):  # noqa: D103
     driver = AsyncGraphDatabase().driver(getenv('NEO4J_URL'),
-                                         auth=(getenv('NEO4J_USERNAME'), getenv('NEO4J_PASSWORD')))
+                                         auth=(getenv('NEO4J_USERNAME'),
+                                               getenv('NEO4J_PASSWORD')))
     app.ctx.neo4j_driver = driver
     isim.set_driver(driver)
 
 
 async def shutdown_neo4j(app: Sanic):  # noqa: D103
     await app.ctx.neo4j_driver.close()
+
+
+async def initialize_sqlite(app: Sanic):  # noqa: D103
+    app.ctx.sqlite_db = await aiosqlite.connect(getenv('SQLITE_DB_PATH'))
+
+
+async def shutdown_sqlite(app: Sanic):  # noqa: D103
+    await app.ctx.sqlite_db.close()
 
 
 def manager() -> Sanic:  # noqa: D103
@@ -50,6 +60,8 @@ def manager() -> Sanic:  # noqa: D103
     set_config(app)
     app.before_server_start(initialize_nats)
     app.before_server_start(initialize_neo4j)
+    app.before_server_start(initialize_sqlite)
+    app.before_server_stop(shutdown_sqlite)
     app.before_server_stop(shutdown_neo4j)
     app.before_server_stop(shutdown_nats)
     return app
