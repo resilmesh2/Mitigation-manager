@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import reduce
 from math import fabs
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, LiteralString
+from typing import TYPE_CHECKING, LiteralString, get_args
 from uuid import uuid4
 
 from manager import config
@@ -20,42 +20,43 @@ JsonPrimitive = str | int | float | bool
 
 
 class Alert(SimpleNamespace):
+
+    TRANSLATIONS = {  # noqa: RUF012
+        'rule': {
+            'id': 'rule_id',
+        },
+        'syscheck': {
+            'sha1_after': 'file_hash',
+            'path': 'file_path',
+        },
+        'agent': {
+            'id': 'agent_id',
+            'ip': 'agent_ip',
+        },
+        'data': {
+            'dst_ip': 'connection_dst_ip',
+            'src_port': 'connection_src_port',
+            'dst_port': 'connection_dst_port',
+        },
+    }
+
     def __init__(self, alert: dict) -> None:
-        if 'rule' in alert:
-            with alert['rule'] as field:
-                subfields = ['id']
-                if any(type(field[t]) is not JsonPrimitive for t in subfields):
-                    msg = 'Alert fields contain non-primitive values'
-                    raise ValueError(msg)
-                self.rule_id = field['id']
+        self._set(alert, self.TRANSLATIONS)
 
-        if 'syscheck' in alert:
-            with alert['syscheck'] as field:
-                subfields = ['sha1_after', 'path']
-                if any(type(field[t]) is not JsonPrimitive for t in subfields):
-                    msg = 'Alert fields contain non-primitive values'
+    def _set(self, a: dict, d: dict):
+        for f in d:
+            if f not in a:
+                continue
+            if type(d[f]) is dict:
+                if type(a[f]) is not dict:
+                    msg = f"Expected 'dict' in alert field '{f}', got '{type(a[f])}'"
                     raise ValueError(msg)
-                self.file_hash = field['sha1_after']
-                self.file_path = field['path']
-
-        if 'agent' in alert:
-            with alert['agent'] as field:
-                subfields = ['id', 'ip']
-                if any(type(field[t]) is not JsonPrimitive for t in subfields):
-                    msg = 'Alert fields contain non-primitive values'
+                self._set(a[f], d[f])
+            elif type(d[f]) is str:
+                if all(not isinstance(a[f], t) for t in get_args(JsonPrimitive)):
+                    msg = f"Expected JSON primitive in alert field '{f}', got '{type(a[f])}'"
                     raise ValueError(msg)
-                self.agent_ip = field['ip']
-                self.agent_id = field['id']
-
-        if 'data' in alert:
-            with alert['data'] as field:
-                subfields = ['dst_ip', 'src_port', 'dst_port']
-                if any(type(field[t]) is not JsonPrimitive for t in subfields):
-                    msg = 'Alert fields contain non-primitive values'
-                    raise ValueError(msg)
-                self.connection_dst_ip = field['dst_ip']
-                self.connection_src_port = field['src_port']
-                self.connection_dst_port = field['dst_port']
+                setattr(self, d[f], a[f])
 
 
 class Node:
