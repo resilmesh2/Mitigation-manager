@@ -1,20 +1,20 @@
 from manager import config
-from manager.model.state_manager import Node, AttackNode
+from manager.model import Node, AttackNode
 
 
 def test_attack_graph_creation():
-    node: Node = AttackNode('T0000', [])\
-        .then(AttackNode, 'T0001', [])\
-        .then(AttackNode, 'T0002', [])\
+    node: Node = AttackNode('T0000', [], [])\
+        .then(AttackNode, 'T0001', [], [])\
+        .then(AttackNode, 'T0002', [], [])\
         .last()
 
     while node.prv is not None:
         assert type(node) is AttackNode
         node = node.prv
 
-    node: Node = AttackNode('T0004', [])\
-        .then(AttackNode, 'T0005', [])\
-        .then(AttackNode, 'T0006', [])\
+    node: Node = AttackNode('T0004', [], [])\
+        .then(AttackNode, 'T0005', [], [])\
+        .then(AttackNode, 'T0006', [], [])\
         .first()
 
     while node.nxt is not None:
@@ -23,9 +23,9 @@ def test_attack_graph_creation():
         node = node.nxt
 
 def test_attack_graph_linkage():
-    node: Node = AttackNode('T0000', [])\
-        .then(AttackNode, 'T0001', [])\
-        .then(AttackNode, 'T0002', [])\
+    node: Node = AttackNode('T0000', [], [])\
+        .then(AttackNode, 'T0001', [], [])\
+        .then(AttackNode, 'T0002', [], [])\
         .first()
     cur = node.nxt
     prev = node
@@ -38,9 +38,9 @@ def test_attack_graph_linkage():
     assert prev.nxt is None
 
 def test_attack_graph_sets():
-    node: AttackNode = AttackNode('First', [])\
-        .then(AttackNode, 'Second', [])\
-        .then(AttackNode, 'Third', [])\
+    node: AttackNode = AttackNode('First', [], [])\
+        .then(AttackNode, 'Second', [], [])\
+        .then(AttackNode, 'Third', [], [])\
         .first()  # pyright:ignore
     assert len(node.all_before()) == 0
     assert len(node.all_after()) == 2
@@ -53,9 +53,9 @@ def test_attack_graph_sets():
 
 
 def test_factor_1():
-    node: AttackNode = AttackNode('T0001', [])\
-        .then(AttackNode, 'T0002', [])\
-        .then(AttackNode, 'T0003', [])\
+    node: AttackNode = AttackNode('T0001', [], [])\
+        .then(AttackNode, 'T0002', [], [])\
+        .then(AttackNode, 'T0003', [], [])\
         .first()  # pyright:ignore
 
     prev = node._factor_1()
@@ -76,9 +76,9 @@ def test_factor_1():
 
 
 def test_factor_2():
-    node: AttackNode = AttackNode('T0003', [])\
-        .then(AttackNode, 'T0002', [])\
-        .then(AttackNode, 'T0001', [])\
+    node: AttackNode = AttackNode('T0003', [], [])\
+        .then(AttackNode, 'T0002', [], [])\
+        .then(AttackNode, 'T0001', [], [])\
         .first()  # pyright:ignore
     assert type(node) is AttackNode
 
@@ -94,5 +94,5 @@ def test_factor_2():
     assert node._factor_2() <= f2, 'Second factor was higher with a shorter attack graph'
 
     # If the graph is bigger, factor 2 will always be equal or bigger.
-    node.last().nxt = AttackNode('T9998', []).then(AttackNode, 'T9999', []).first()
+    node.last().nxt = AttackNode('T9998', [], []).then(AttackNode, 'T9999', [], []).first()
     assert node._factor_2() >= f2, 'Second factor was lower with a longer attack graph'
