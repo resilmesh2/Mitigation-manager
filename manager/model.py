@@ -147,7 +147,7 @@ class AttackNode(Node):
         self.technique = technique
         self.conditions = conditions
         self.probability_history = probability_history
-        self.probability = probability_history[-1]
+        self.probability = probability_history[-1] if len(probability_history) > 0 else 0.0
 
         self._cache_flat_map = None
         self._cache_all_before = None
@@ -267,7 +267,7 @@ class CVECondition(Condition):
     def __init__(self, cve_identifier: str) -> None:
         super().__init__(
             params={'cve_id': cve_identifier},
-            args={'ip_address': 'agent.ip'},
+            args={'ip_address': 'agent_ip'},
             query='MATCH (ip:IP)<-[:HAS_ASSIGNED]-(:Node)'
             '-[:IS_A]-(:Host)<-[:ON]-(:SoftwareVersion)<-[:IN]-'
             '(:Vulnerability)-[:REFERS_TO]->(cve:CVE {CVE_id: $cve_id})\n'
