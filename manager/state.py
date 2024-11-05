@@ -58,7 +58,7 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
     future: list[AttackNode] = []
     # 1: Advance local state if necessary.
     for node in state:
-        _next = node.next()
+        _next = node.nxt
         if _next is None:
             # Attack finished, but we might want to mitigate the
             # attack tree.  Keep it for now.
