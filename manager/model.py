@@ -177,8 +177,15 @@ class AttackNode:
              *,
              prv: AttackNode | None = None,
              nxt: AttackNode | None = None) -> AttackNode:
-        """Add a new node after the current one and switch to it."""
+        """Add a new node after the current one and switch to it.
+
+        If a node is already attached, it is fully detached.  Even if
+        the described node specifies `prv`, `prv` is replaced with the
+        current node.
+        """
         tmp = AttackNode(identifier, technique, conditions, probability_history, prv=prv, nxt=nxt)
+        if self.nxt is not None:
+            self.nxt.prv = None
         tmp.prv = self
         self.nxt = tmp
         return tmp
