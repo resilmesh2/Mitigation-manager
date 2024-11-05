@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, LiteralString, get_args
 
 from manager import config
-from manager.isim import check_condition
+from manager.isim import check_conditions
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -62,12 +62,41 @@ class Condition:
     def __init__(self, params: dict[str, JsonPrimitive],
                  args: dict[str, str | list[str]],
                  query: LiteralString,
-                 check_function: Callable[[list[Record], dict[str, JsonPrimitive]], bool],
+                 checks: list[Callable[[list[Record], dict[str, JsonPrimitive]], bool]],
                  ) -> None:
         self.params = params
         self.args = args
         self.query: LiteralString = query
-        self.check_function = check_function
+        self.checks = checks
+
+    @staticmethod
+    def check_any_result(records: list[Record], _: dict[str, JsonPrimitive]) -> bool:
+        """Return true only if there's at least one result."""
+        return len(records) > 0
+
+    @staticmethod
+    def _check_row_params(records: list[Record], params: dict[str, JsonPrimitive], _row, _param) -> bool:
+        return _row(_param(params[x] == r.get(x) for x in params) for r in records)
+
+    @staticmethod
+    def check_any_param_in_any_row(records: list[Record], params: dict[str, JsonPrimitive]) -> bool:
+        """Return true only if some row matches some parameter."""
+        return Condition._check_row_params(records, params, any, any)
+
+    @staticmethod
+    def check_all_params_in_any_row(records: list[Record], params: dict[str, JsonPrimitive]) -> bool:
+        """Return true only if some row matches all parameters."""
+        return Condition._check_row_params(records, params, any, all)
+
+    @staticmethod
+    def check_any_param_in_all_rows(records: list[Record], params: dict[str, JsonPrimitive]) -> bool:
+        """Return true only if all rows match some parameter."""
+        return Condition._check_row_params(records, params, all, any)
+
+    @staticmethod
+    def check_all_params_in_all_rows(records: list[Record], params: dict[str, JsonPrimitive]) -> bool:
+        """Return true only if all rows match all parameters."""
+        return Condition._check_row_params(records, params, all, all)
 
     def parameters(self, alert: Alert) -> dict[str, JsonPrimitive] | None:
         """Return a dict containing parameters and their values."""
@@ -100,7 +129,7 @@ class Condition:
         # fulfilled.
         if p is None:
             return False
-        return await check_condition(self.query, p, self.check_function)
+        return await check_conditions(self.query, p, self.checks)
 
 
 class AttackNode:
@@ -250,6 +279,7 @@ class CVECondition(Condition):
             '-[:IS_A]-(:Host)<-[:ON]-(:SoftwareVersion)<-[:IN]-'
             '(:Vulnerability)-[:REFERS_TO]->(cve:CVE {CVE_id: $cve_id})\n'
             'RETURN ip.address as ip_address',
-            check_function=lambda records, parameters:
-            any(parameters['ip_address'] == r.get('ip_address') for r in records),
+            checks=[lambda records, parameters:
+                    any(parameters['ip_address'] == r.get('ip_address')
+                        for r in records)],
         )

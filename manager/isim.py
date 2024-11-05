@@ -21,10 +21,10 @@ def get_driver() -> AsyncDriver:
     return DRIVER
 
 
-async def check_condition(query: LiteralString,
-                          parameters: dict,
-                          condition: Callable[[list[Record], dict], bool],
-                          ) -> bool:
+async def check_conditions(query: LiteralString,
+                           parameters: dict,
+                           conditions: list[Callable[[list[Record], dict], bool]],
+                           ) -> bool:
     """Query the ISIM and evaluate a condition."""
     res = await get_driver().execute_query(Query(query), parameters)
-    return condition(res.records, parameters)
+    return all(c(res.records, parameters) for c in conditions)
