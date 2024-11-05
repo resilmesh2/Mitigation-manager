@@ -59,11 +59,14 @@ class Alert(SimpleNamespace):
 
 
 class Condition:
-    def __init__(self, params: dict[str, JsonPrimitive],
+    def __init__(self,
+                 identifier: int,
+                 params: dict[str, JsonPrimitive],
                  args: dict[str, str | list[str]],
                  query: LiteralString,
                  checks: list[Callable[[list[Record], dict[str, JsonPrimitive]], bool]],
                  ) -> None:
+        self.identifier = identifier
         self.params = params
         self.args = args
         self.query: LiteralString = query
@@ -280,6 +283,7 @@ class Workflow:
 class CVECondition(Condition):
     def __init__(self, cve_identifier: str) -> None:
         super().__init__(
+            int.from_bytes(bytes(cve_identifier, 'UTF-8')),
             params={'cve_id': cve_identifier},
             args={'ip_address': 'agent_ip'},
             query='MATCH (ip:IP)<-[:HAS_ASSIGNED]-(:Node)'
