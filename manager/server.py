@@ -1,4 +1,5 @@
 from json import loads
+from pathlib import Path
 
 import aiosqlite
 import nats
@@ -6,7 +7,7 @@ from nats.aio.msg import Msg
 from neo4j import AsyncGraphDatabase
 from sanic import Blueprint, Sanic
 
-from manager import bg_manager, isim
+from manager import bg_manager, isim, state
 from manager.config import getenv, log, set_config
 from manager.tasks import handle_alert
 
@@ -47,6 +48,13 @@ async def shutdown_neo4j(app: Sanic):  # noqa: D103
 
 async def initialize_sqlite(app: Sanic):  # noqa: D103
     app.ctx.sqlite_db = await aiosqlite.connect(getenv('SQLITE_DB_PATH'))
+    with Path().open('resources/init.sql') as f:
+        script = f.read()
+    c = await app.ctx.sqlite_db.cursor()
+    await c.executescript(script)
+    await app.ctx.sqlite_db.commit()
+    await c.close()
+    state.set_handler(state.DatabaseHandler(app.ctx.sqlite_db))
 
 
 async def shutdown_sqlite(app: Sanic):  # noqa: D103
