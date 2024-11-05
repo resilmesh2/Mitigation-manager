@@ -58,7 +58,7 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
     future: list[AttackNode] = []
     # 1: Advance local state if necessary.
     for node in state:
-        _next = node.next_attack()
+        _next = node.next()
         if _next is None:
             # Attack finished, but we might want to mitigate the
             # attack tree.  Keep it for now.
@@ -69,7 +69,7 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
             old_state.append(node)
 
     # 2: Update probability percentages.
-    all_nodes = {n for node in state for n in node.all_attack_nodes()}
+    all_nodes = {n for node in state for n in node.all()}
     tasks.append(_update_probabilities([n for n in all_nodes if n.update_probability(alert)]))
 
     # Run all DB updates
@@ -81,15 +81,11 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
 
     for node in state:
         # Past: judge based on risk history
-        for n in node.all_before():
-            if n.historically_risky():
-                past.append(n)
+        (past.append(n) for n in node.all_before() if n.historically_risky())
         # Present: only if it was related to this alert
         if alert.rule_id == node.technique:
             present.append(node)
         # Future: judge based on how likely it is
-        for n in node.all_after():
-            if n.probability > config.PROBABILITY_TRESHOLD:
-                future.append(n)
+        (future.append(n) for n in node.all_after() if n.probability > config.PROBABILITY_TRESHOLD)
 
     return (past, present, future)

@@ -1,31 +1,49 @@
 from manager import config
-from manager.model import Node, AttackNode
+from manager.model import AttackNode
 
 
 def test_attack_graph_creation():
-    node: Node = AttackNode('T0000', [], [])\
-        .then(AttackNode, 'T0001', [], [])\
-        .then(AttackNode, 'T0002', [], [])\
+    node = AttackNode(123, 'T0000', [], [])\
+        .then(456, 'T0001', [], [])\
+        .then(789, 'T0002', [], [])\
         .last()
 
-    while node.prv is not None:
-        assert type(node) is AttackNode
-        node = node.prv
+    assert node.identifier == 789
+    assert node.technique == 'T0002'
 
-    node: Node = AttackNode('T0004', [], [])\
-        .then(AttackNode, 'T0005', [], [])\
-        .then(AttackNode, 'T0006', [], [])\
+    node = node.prv
+    assert node is not None
+    assert node.identifier == 456
+    assert node.technique == 'T0001'
+
+    node = node.prv
+    assert node is not None
+    assert node.identifier == 123
+    assert node.technique == 'T0000'
+
+    node = AttackNode(123, 'T0004', [], [])\
+        .then(456, 'T0005', [], [])\
+        .then(789, 'T0006', [], [])\
         .first()
 
-    while node.nxt is not None:
-        print(f'Node: {node}')
-        assert type(node) is AttackNode
-        node = node.nxt
+    assert node.identifier == 123
+    assert node.technique == 'T0004'
+
+    node = node.nxt
+    assert node is not None
+    assert node.identifier == 456
+    assert node.technique == 'T0005'
+
+    node = node.nxt
+    assert node is not None
+    assert node.identifier == 789
+    assert node.technique == 'T0006'
+
 
 def test_attack_graph_linkage():
-    node: Node = AttackNode('T0000', [], [])\
-        .then(AttackNode, 'T0001', [], [])\
-        .then(AttackNode, 'T0002', [], [])\
+    node = AttackNode(123, 'T0000', [], [])\
+        .then(456, 'T0001', [], [])\
+        .then(789, 'T0002', [], [])\
         .first()
     cur = node.nxt
     prev = node
@@ -38,25 +56,27 @@ def test_attack_graph_linkage():
     assert prev.nxt is None
 
 def test_attack_graph_sets():
-    node: AttackNode = AttackNode('First', [], [])\
-        .then(AttackNode, 'Second', [], [])\
-        .then(AttackNode, 'Third', [], [])\
-        .first()  # pyright:ignore
+    node = AttackNode(123, 'First', [], [])\
+        .then(456, 'Second', [], [])\
+        .then(789, 'Third', [], [])\
+        .first()
     assert len(node.all_before()) == 0
     assert len(node.all_after()) == 2
     node = node.nxt  # pyright:ignore
+    assert node is not None
     assert len(node.all_before()) == 1
     assert len(node.all_after()) == 1
     node = node.nxt  # pyright:ignore
+    assert node is not None
     assert len(node.all_before()) == 2
     assert len(node.all_after()) == 0
 
 
 def test_factor_1():
-    node: AttackNode = AttackNode('T0001', [], [])\
-        .then(AttackNode, 'T0002', [], [])\
-        .then(AttackNode, 'T0003', [], [])\
-        .first()  # pyright:ignore
+    node = AttackNode(123, 'T0001', [], [])\
+        .then(456, 'T0002', [], [])\
+        .then(789, 'T0003', [], [])\
+        .first()
 
     prev = node._factor_1()
     n = node.nxt
@@ -76,15 +96,15 @@ def test_factor_1():
 
 
 def test_factor_2():
-    node: AttackNode = AttackNode('T0003', [], [])\
-        .then(AttackNode, 'T0002', [], [])\
-        .then(AttackNode, 'T0001', [], [])\
-        .first()  # pyright:ignore
+    node = AttackNode(123, 'T0003', [], [])\
+        .then(456, 'T0002', [], [])\
+        .then(789, 'T0001', [], [])\
+        .first()
     assert type(node) is AttackNode
 
     f2 = node._factor_2()
 
-    for n in node.all_attack_nodes():
+    for n in node.all():
         assert f2 == n._factor_2(), 'Not all nodes in the same graph have the same second factor'
 
     # If the graph is smaller, factor 2 will always be equal or
@@ -94,5 +114,5 @@ def test_factor_2():
     assert node._factor_2() <= f2, 'Second factor was higher with a shorter attack graph'
 
     # If the graph is bigger, factor 2 will always be equal or bigger.
-    node.last().nxt = AttackNode('T9998', [], []).then(AttackNode, 'T9999', [], []).first()
+    node.last().nxt = AttackNode(123, 'T9998', [], []).then(456, 'T9999', [], []).first()
     assert node._factor_2() >= f2, 'Second factor was lower with a longer attack graph'

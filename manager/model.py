@@ -4,7 +4,6 @@ from functools import reduce
 from math import fabs
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, LiteralString, get_args
-from uuid import uuid4
 
 from manager import config
 from manager.isim import check_condition
@@ -59,35 +58,6 @@ class Alert(SimpleNamespace):
                 setattr(self, d[f], a[f])
 
 
-class Node:
-    def __init__(self, _prev: Node | None, _next: Node | None) -> None:
-        self.id = uuid4()
-        self.prv = _prev
-        self.nxt = _next
-
-    def first(self) -> Node:
-        """Select the first node in the attack graph."""
-        ret = self
-        while ret.prv is not None:
-            ret = ret.prv
-        return ret
-
-    def last(self) -> Node:
-        """Select the last node in the attack graph."""
-        ret = self
-        while ret.nxt is not None:
-            ret = ret.nxt
-        return ret
-
-    def then(self, _type: type[Node], *args, **kwargs) -> Node:
-        """Add a new node after the current one and switch to it."""
-        tmp = _type.__new__(_type)
-        tmp.__init__(*args, **kwargs)
-        tmp.prv = self
-        self.nxt = tmp
-        return tmp
-
-
 class Condition:
     def __init__(self, params: dict[str, JsonPrimitive],
                  args: dict[str, str | list[str]],
@@ -133,17 +103,20 @@ class Condition:
         return await check_condition(self.query, p, self.check_function)
 
 
-class AttackNode(Node):
-    """Represents a MITRE tactic."""
+class AttackNode:
+    """Represents a node in an attack graph."""
 
     def __init__(self,
+                 identifier: int,
                  technique: str,
                  conditions: list[Condition],
                  probability_history: list[float],
                  *,
-                 _prev: Node | None = None,
-                 _next: Node | None = None) -> None:
-        super().__init__(_prev, _next)
+                 prv: AttackNode | None = None,
+                 nxt: AttackNode | None = None) -> None:
+        self.identifier = identifier
+        self.prv = prv
+        self.nxt = nxt
         self.technique = technique
         self.conditions = conditions
         self.probability_history = probability_history
@@ -152,6 +125,34 @@ class AttackNode(Node):
         self._cache_flat_map = None
         self._cache_all_before = None
         self._cache_all_after = None
+
+    def first(self) -> AttackNode:
+        """Select the first node in the attack graph."""
+        ret = self
+        while ret.prv is not None:
+            ret = ret.prv
+        return ret
+
+    def last(self) -> AttackNode:
+        """Select the last node in the attack graph."""
+        ret = self
+        while ret.nxt is not None:
+            ret = ret.nxt
+        return ret
+
+    def then(self,
+             identifier: int,
+             technique: str,
+             conditions: list[Condition],
+             probability_history: list[float],
+             *,
+             prv: AttackNode | None = None,
+             nxt: AttackNode | None = None) -> AttackNode:
+        """Add a new node after the current one and switch to it."""
+        tmp = AttackNode(identifier, technique, conditions, probability_history, prv=prv, nxt=nxt)
+        tmp.prv = self
+        self.nxt = tmp
+        return tmp
 
     def _factor_1(self, graph_interest: float = config.GRAPH_INTEREST) -> float:
         """Return the first factor used in calculating probability.
@@ -177,31 +178,6 @@ class AttackNode(Node):
                    [len(n.conditions) for n in self.all_after()] +
                    [len(self.conditions)]) / max_conditions * ease_impact
 
-    def next_attack(self) -> AttackNode | None:
-        """Select the next attack node in the attack graph."""
-        tmp = self.nxt
-        while tmp is not None and type(tmp) is not AttackNode:
-            tmp = tmp.nxt
-        return tmp
-
-    def all_attack_nodes(self) -> set[AttackNode]:
-        """Collect all attack nodes in the attack graph."""
-        if self._cache_flat_map is not None:
-            return self._cache_flat_map
-        ret: set[AttackNode] = set()
-        b = self.prv
-        while b is not None:
-            if type(b) is AttackNode:
-                ret.add(b)
-                b = b.prv
-        a = self.nxt
-        while a is not None:
-            if type(a) is AttackNode:
-                ret.add(a)
-                a = a.nxt
-        self._cache_flat_map = ret
-        return ret
-
     async def update_probability(self,
                                  alert: Alert,
                                  epsilon: float = config.PROBABILITY_EPSILON,
@@ -225,30 +201,32 @@ class AttackNode(Node):
         return risk > config.PROBABILITY_TRESHOLD
 
     def all_before(self) -> set[AttackNode]:
-        """Collect all attack nodes before the current one."""
+        """Collect all nodes before the current one."""
         if self._cache_all_before is not None:
             return self._cache_all_before
         ret = set()
         tmp = self.prv
         while tmp is not None:
-            if type(tmp) is AttackNode:
-                ret.add(tmp)
-                tmp = tmp.prv
+            ret.add(tmp)
+            tmp = tmp.prv
         self._cache_all_before = ret
         return ret
 
     def all_after(self) -> set[AttackNode]:
-        """Collect all attack nodes after the current one."""
+        """Collect all nodes after the current one."""
         if self._cache_all_after is not None:
             return self._cache_all_after
         ret = set()
         tmp = self.nxt
         while tmp is not None:
-            if type(tmp) is AttackNode:
-                ret.add(tmp)
-                tmp = tmp.nxt
+            ret.add(tmp)
+            tmp = tmp.nxt
         self._cache_all_after = ret
         return ret
+
+    def all(self) -> set[AttackNode]:
+        """Collect all nodes in the attack graph."""
+        return self.all_before() | {self} | self.all_after()
 
 
 class Workflow:
