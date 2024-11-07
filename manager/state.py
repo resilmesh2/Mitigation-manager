@@ -175,12 +175,15 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
     past: list[AttackNode] = []
     present: list[AttackNode] = []
     future: list[AttackNode] = []
+
+    completed: list[AttackNode] = []
     # 1: Advance local state if necessary.
     for node in state:
         _next = node.nxt
         if _next is None:
             # Attack finished, but we might want to mitigate the
             # attack tree.  Keep it for now.
+            completed.append(node.first())
             continue
         if alert.rule_id == _next.technique:
             tasks.append(get_handler().update_state(node, _next))
