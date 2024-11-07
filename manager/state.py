@@ -107,16 +107,16 @@ class DatabaseHandler:
         query_initial = (
             'SELECT *'
             'FROM AttackNodes'
-            f'WHERE id = {nxt}'
+            'WHERE id = ?'
         )
         query_recursive = (
             'SELECT *'
             'FROM AttackNodes'
-            'WHERE prv = {}'
+            'WHERE prv = ?'
         )
         q = query_initial
         while True:
-            async with self.connection.execute(q) as cursor:
+            async with self.connection.execute(q, (nxt,)) as cursor:
                 if cursor.arraysize > 1:
                     msg = 'Multiple next nodes for attack node'
                     raise ValueError(msg)
