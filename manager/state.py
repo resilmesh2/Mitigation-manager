@@ -19,10 +19,10 @@ if TYPE_CHECKING:
 HANDLER: DatabaseHandler | None = None
 
 
-def set_handler(hanlder: DatabaseHandler):
+def set_handler(handler: DatabaseHandler):
     """Set the global ISIM driver."""
     global HANDLER
-    HANDLER = hanlder
+    HANDLER = handler
 
 
 def get_handler() -> DatabaseHandler:
