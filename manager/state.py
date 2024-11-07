@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+import asyncio
 from asyncio import gather
 from json import dumps, loads
 from types import MappingProxyType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, LiteralString, TypeVar
 
 from manager import config
 from manager.model import AttackNode, Condition
 
 if TYPE_CHECKING:
-    from collections.abc import Coroutine
+    from collections.abc import Callable, Coroutine
 
     from aiosqlite import Connection, Row
 
@@ -43,30 +44,25 @@ class DatabaseHandler:
         4: Condition.check_any_param_in_any_row,
     })
 
+    T = TypeVar('T')
+
+    @staticmethod
+    def _mkstr(_list: list[T], f: Callable[[T], str] = str) -> str:
+        return ' '.join(f(e) for e in _list)
+
+    @staticmethod
+    def _mklist(_list: str, f: Callable[[str], T]) -> list[T]:
+        return [f(e) for e in _list.split(' ')]
+
     def __init__(self, connection: Connection) -> None:
         self.connection = connection
 
-    async def retrieve_state(self) -> list[AttackNode]:
-        """Return the list of current attack graphs.
-
-        The graphs are represented as a list of the last fulfilled
-        attack nodes, each linked to the previous/next nodes to form
-        the attack graph.
-        """
-        return []
-
-    async def retrieve_initial_nodes(self) -> list[AttackNode]:
-        """Return the list of initial nodes for all attack graphs."""
-        ret = []
-        query_get_initial_nodes = (
-            'SELECT'
-            'FROM AttackGraphs'
-            'WHERE taking_place = 1'
-        )
-        async with self.connection.execute(query_get_initial_nodes) as cursor:
-            async for row in cursor:
-                ret.append(AttackNode(*await self._extract_node_parameters(row)))
-        return ret
+    async def _extract_condition_parameters(self, row: Row) -> tuple[int, dict, dict, LiteralString, list[Callable]]:
+        return (row['identifier'],
+                loads(row['params']),
+                loads(row['args']),
+                row['query'],
+                self._mklist(row['checks'], lambda s: DatabaseHandler.CHECK_CODES[int(s)]))
 
     async def retrieve_condition(self, identifier: int) -> Condition | None:
         """Return the condition specified by the identifier.
@@ -82,25 +78,90 @@ class DatabaseHandler:
             row = await cursor.fetchone()
             if row is None:
                 return None
-            identifier = row['identifier']
-            params = loads(row['params'])
-            args = loads(row['args'])
-            query = loads(row['query'])
-            conditions = [DatabaseHandler.CHECK_CODES[int(c)]
-                           for c in str(row['checks']).split(' ')]
+            return Condition(*await self._extract_condition_parameters(row))
 
-            return Condition(identifier, params, args, query, conditions)
+    async def store_condition(self, condition: Condition) -> None:
+        """Store a condition."""
+        query = 'INSERT INTO Conditions VALUES (?, ?, ?, ?, ?)'
+        checks = ' '.join(str(i)
+                          for i in DatabaseHandler.CHECK_CODES
+                          if DatabaseHandler.CHECK_CODES[i] in condition.checks)
+        await self.connection.execute(query, (condition.identifier,
+                                              dumps(condition.params),
+                                              dumps(condition.args),
+                                              condition.query,
+                                              checks))
+        await self.connection.commit()
 
-    async def _extract_node_parameters(self, row: Row) -> list:
+    async def _extract_node_parameters(self, row: Row) -> tuple[int, str, list[Condition], list[float]]:
         identifier = int(row['identifier'])
         technique: str = row['technique']
-        conditions: list[Condition] = [x for x in [await self.retrieve_condition(int(c))
-                                                   for c in row['conditions'].split(' ')]
-                                       if x is not None]
+        conditions = [await self.retrieve_condition(c) for c in self._mklist(row['condition'], int)]
         probabilities = [float(p) for p in row['probabilities'].split(' ')]
-        return [identifier, technique, conditions, probabilities]
+        return (identifier, technique, [e for e in conditions if e is not None], probabilities)
 
-    async def retrieve_full_graph(self, initial_node: AttackNode) -> AttackNode:
+    async def retrieve_node(self, identifier: int) -> AttackNode | None:
+        """Return the attack specified by the identifier.
+
+        Returns `None` if the attack node can't be found.  This
+        method does not return the full attack graph - the node's
+        `prv` and `nxt` values will be `None`.
+        """
+        query = (
+            'SELECT technique, conditions, probabilities, description'
+            'FROM AttackNodes'
+            f'WHERE id = {identifier}'
+        )
+        async with self.connection.execute(query) as cursor:
+            row = await cursor.fetchone()
+            if row is None:
+                return None
+            return AttackNode(*await self._extract_node_parameters(row))
+
+    async def store_node(self, node: AttackNode) -> None:
+        """Store a node.
+
+        The node's conditions don't have to be fully defined, they
+        just need to contain the proper identifier.
+        """
+        query = 'INSERT INTO AttackNodes VALUES (?, ?, ?, ?, ?, ?, ?)'
+        parameters = (node.identifier,
+                      node.prv.identifier if node.prv is not None else None,
+                      node.nxt.identifier if node.nxt is not None else None,
+                      node.technique,
+                      self._mkstr(node.conditions, lambda c: str(c.identifier)),
+                      self._mkstr([node.probability, *node.probability_history]),
+                      'description')
+        await self.connection.execute(query, parameters)
+        await self.connection.commit()
+
+    async def retrieve_state(self) -> list[AttackNode]:
+        """Return the list of current attack graphs.
+
+        The graphs are represented as a list of the last fulfilled
+        attack nodes, each linked to the previous/next nodes to form
+        the attack graph.
+        """
+        return [await self._retrieve_full_graph(n) for n in await self._retrieve_initial_nodes()]
+
+    async def _retrieve_initial_nodes(self) -> list[AttackNode]:
+        """Return the list of initial nodes for active attack graphs.
+
+        This method does not return full attack graphs - the nodes'
+        `prv` and `nxt` values will be `None`.
+        """
+        ret = []
+        query_get_initial_nodes = (
+            'SELECT id, technique, conditions, probabilities, description'
+            'FROM AttackGraphs'
+            'WHERE taking_place = TRUE'
+        )
+        async with self.connection.execute(query_get_initial_nodes) as cursor:
+            async for row in cursor:
+                ret.append(AttackNode(*await self._extract_node_parameters(row)))
+        return ret
+
+    async def _retrieve_full_graph(self, initial_node: AttackNode) -> AttackNode:
         """Return an initial node's complete attack graph."""
         final_node = initial_node
         nxt = initial_node.identifier
@@ -129,33 +190,60 @@ class DatabaseHandler:
                     return final_node.first()
             q = query_recursive.format(nxt)
 
-    def _retrieve_potential_graphs(self, technique: str) -> list[AttackNode]:
-        """Return a list of potential new attack graphs.
+    async def retrieve_potential_graphs(self, technique: str) -> list[AttackNode]:
+        """Return a list of potential new attack graphs."""
+        ret = []
+        query = (
+            'SELECT an.id AS identifier'
+            'FROM AttackNodes AS an'
+            'INNER JOIN AttackGraphs AS ag ON an.id = ag.starting_node'
+            'WHERE an.technique = ?'
+        )
+        parameters = (technique,)
+        async with self.connection.execute(query, parameters) as cursor:
+            async for row in cursor:
+                node = await self.retrieve_node(row['identifier'])
+                if node is None:
+                    continue
+                ret.append(node)
+        return ret
 
-        The return structure is the same as in _retrieve_state(), but
-        representing instead the already fulfilled attack nodes of
-        attack graphs not considered before.
+    async def mark_complete(self, node: AttackNode):
+        """Mark the attack node as completed.
+
+        If there is a next node, mark it as the new attack front.
         """
-        return []
+        tasks = []
+        query = (
+            'UPDATE AttackNodes'
+            'SET ongoing = 0'
+            'WHERE id = ?'
+        )
+        parameters = (node.identifier,)
+        tasks.append(self.connection.execute(query, parameters))
 
-    async def update_state(self, _prev: AttackNode, _next: AttackNode):
-        """Update the new latest node in an attack graph."""
+        nxt = node.nxt
+        if nxt is not None:
+            query = (
+                'UPDATE AttackNodes'
+                'SET ongoing = 1'
+                'WHERE id = ?'
+            )
+            parameters = (nxt.identifier,)
+            tasks.append(self.connection.execute(query, parameters))
 
-    async def update_probabilities(self, _nodes: list[AttackNode]):
-        """Update the probabilities of a list of nodes."""
+        tasks.append(self.connection.commit())
+        await asyncio.gather(*tasks)
 
-    async def store_condition(self, condition: Condition) -> None:
-        """Store a condition object."""
-        query = 'INSERT INTO Conditions VALUES (?, ?, ?, ?, ?)'
-        checks = ' '.join(str(i)
-                          for i in DatabaseHandler.CHECK_CODES
-                          if DatabaseHandler.CHECK_CODES[i] in condition.checks)
-        await self.connection.execute(query, (condition.identifier,
-                                              dumps(condition.params),
-                                              dumps(condition.args),
-                                              condition.query,
-                                              checks))
-        await self.connection.commit()
+    async def update_probability(self, node: AttackNode, probability: float):
+        """Update the probability of a node."""
+        query = (
+            'UPDATE Probabilities'
+            'SET probabilities = ?'
+            'WHERE id = ?'
+        )
+        parameters = (self._mkstr([probability, node.probability, *node.probability_history]), node.identifier)
+        await self.connection.execute(query, parameters)
 
 
 async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list[AttackNode]]:
@@ -186,13 +274,15 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
             completed.append(node.first())
             continue
         if alert.rule_id == _next.technique:
-            tasks.append(get_handler().update_state(node, _next))
+            tasks.append(get_handler().mark_complete(node))
             new_state.append(_next)
             old_state.append(node)
 
     # 2: Update probability percentages.
-    all_nodes = {n for node in state for n in node.all()}
-    tasks.append(get_handler().update_probabilities([n for n in all_nodes if n.update_probability(alert)]))
+    tasks.extend([get_handler().update_probability(n, p)
+                  for n, p in [(n, await n.update_probability(alert))
+                               for node in state for n in node.all()]
+                  if p >= 0])
 
     # Run all DB updates
     await gather(*tasks)
