@@ -135,6 +135,11 @@ class Condition:
         return await check_conditions(self.query, p, self.checks)
 
 
+class DummyCondition(Condition):
+    def __init__(self, identifier: int) -> None:
+        super().__init__(identifier, {}, {}, '', [])
+
+
 class AttackNode:
     """Represents a node in an attack graph."""
 
