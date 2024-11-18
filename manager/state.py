@@ -54,10 +54,38 @@ class DatabaseHandler:
     def _mklist(_list: str, f: Callable[[str], T]) -> list[T]:
         return [f(e) for e in _list.split(' ')]
 
+    @staticmethod
+    def to_dict(item) -> dict | None:
+        if type(item) is Condition:
+            return {
+                'identifier': item.identifier,
+                'params': item.params,
+                'args': item.args,
+                'query': item.query,
+                'checks': DatabaseHandler._mkchecklist(item.checks),
+            }
+        if type(item) is AttackNode:
+            return {
+                'identifier': item.identifier,
+                'prv': item.prv.identifier if item.prv is not None else None,
+                'nxt': item.nxt.identifier if item.nxt is not None else None,
+                'technique': item.technique,
+                'conditions': [c.identifier for c in item.conditions],
+                'probabilities': item.probability_history,
+                'description': None,
+            }
+        return None
+
+    @staticmethod
+    def _mkchecklist(_list: list[Callable]) -> list[int]:
+        return [s for s in DatabaseHandler.CHECK_CODES if DatabaseHandler.CHECK_CODES[s] in _list]
+
     def __init__(self, connection: Connection) -> None:
         self.connection = connection
 
     async def _extract_condition_parameters(self, row: Row) -> tuple[int, dict, dict, LiteralString, list[Callable]]:
+        config.log.debug(row)
+        config.log.debug(row.keys)
         return (row['identifier'],
                 loads(row['params']),
                 loads(row['args']),
@@ -84,9 +112,10 @@ class DatabaseHandler:
     async def store_condition(self, condition: Condition) -> None:
         """Store a condition."""
         query = 'INSERT INTO Conditions VALUES (?, ?, ?, ?, ?)'
-        checks = ' '.join(str(i)
-                          for i in DatabaseHandler.CHECK_CODES
-                          if DatabaseHandler.CHECK_CODES[i] in condition.checks)
+        config.log.info(type(condition.checks))
+        checks = self._mkstr([i
+                              for i in DatabaseHandler.CHECK_CODES
+                              if DatabaseHandler.CHECK_CODES[i] in condition.checks])
         await self.connection.execute(query, (condition.identifier,
                                               dumps(condition.params),
                                               dumps(condition.args),
