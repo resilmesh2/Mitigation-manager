@@ -1,48 +1,15 @@
-from aiohttp import ClientSession
-
-from manager.config import getenv, log
-from manager.model import AttackNode
+from manager.model import AttackNode, Workflow
+from manager.state import get_handler
 
 
-def validate(workflow: dict) -> bool:
-    fields = ['webhook', 'name', 'performs', 'mitigates', 'set_cost', 'variable_cost']
-    return not any(f not in workflow for f in fields)
-
-
-async def execute(workflow: dict) -> dict:
-    # TLDR: call whatever endpoint to run the workflow with the
-    # specified parameters, then return a dict containing whether the
-    # workflow was successful or not.
-    workflow_url = f'http://{getenv("SHUFFLE_HOST")}:{getenv("SHUFFLE_PORT")}/api/v1/hooks/webhook_{workflow["webhook"]}'
-    async with ClientSession() as client, client.get(workflow_url) as response:
-        if response.status == 200:
-            return {
-                'success': True,
-            }
-        log.debug('Workflow request failed with status code %s', response.status)
-        log.debug(await response.text())
-        return {
-            'success': False,
-            'status': response.status,
-            'body': await response.text(),
-        }
-
-
-def successful(results: dict) -> bool:
-    # TLDR: check whether the results say that the workflow executed
-    # correctly or not.
-    return results['success']
-
-
-def error(results: dict) -> str:
-    # TLDR: return a formatted string with debug info on why the
-    # workflow failed.
-    return f'HTTP status code {results["status"]}'
-
-
-async def locate(node: AttackNode) -> dict | None:
+async def locate(node: AttackNode) -> Workflow | None:
     """Retrieve the optimal workflow to mitigate an attack."""
-    return {}
+    valid_workflows = await get_handler().retrieve_applicable_workflows(node.technique)
+
+    if len(valid_workflows) == 0:
+        return None
+    # Current technique: get the lowest cost workflow
+    return sorted(valid_workflows, key=lambda w: w.cost)[0]
 
 
 async def get() -> list[dict]:
