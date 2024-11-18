@@ -1,8 +1,10 @@
-from datetime import datetime
+from asyncio import Condition
 
 from sanic import Blueprint, HTTPResponse, Request, json, empty
 
 from manager.config import log, version
+from manager.model import AttackNode, Condition, DummyCondition
+from manager.state import DatabaseHandler, get_handler
 from manager.tasks import handle_alert
 
 bp_manager = Blueprint('manager')
@@ -43,7 +45,7 @@ def version_endpoint(*_) -> HTTPResponse:
                   format: int32
                   examples:
                     - 0
-    """
+    """  # noqa: W505 RUF100
     return json({
         'version': f'v{version}',
         'major': int(version.split('.')[0]),
@@ -52,10 +54,350 @@ def version_endpoint(*_) -> HTTPResponse:
 
 
 @bp_manager.post('/alert')
-async def post_alert(request: Request):
+async def post_alert(request: Request) -> HTTPResponse:
+    """Process an alert.
+
+    openapi:
+    ---
+    requestBody:
+      description: The alert to process.
+      content:
+        application/json:
+          schema:
+            type: object
+            description: A Wazuh alert in JSON format.
+          example:
+            timestamp: '2024-10-22T09:18:46.153+0000'
+            rule:
+              level: 8
+              description: Execute permission added to python script.
+              id: '100003'
+              mitre:
+                id:
+                  - T1222.002
+                tactic:
+                  - Defense Evasion
+                technique:
+                  - Linux and Mac File and Directory Permissions Modification
+              firedtimes: 4
+              mail: false
+              groups:
+                - syscheck
+            agent:
+              id: '001'
+              name: eeb0036baf28
+              ip: 192.168.200.200
+            manager:
+              name: wazuh.manager
+            id: '1729588726.22091'
+            full_log: |
+              File '/tmp/zerologon_tester.py' modified
+              Mode: realtime
+              Changed attributes: permission
+              Permissions changed from 'rw-r--r--' to 'rwxr-xr-x'
+            syscheck:
+              path: /tmp/zerologon_tester.py
+              mode: realtime
+              size_after: '3041'
+              perm_before: rw-r--r--
+              perm_after: rwxr-xr-x
+              uid_after: '0'
+              gid_after: '0'
+              md5_after: 0008432c27c43f9fe58e9bf191f9c6cf
+              sha1_after: 84dc56d99268f70619532536f8445f56609547c7
+              sha256_after: b8ae48c2e46c28f1004e006348af557c7d912036b9ead88be67bca2bafde01d3
+              uname_after: root
+              gname_after: root
+              mtime_after: '2024-10-22T09:16:02'
+              inode_after: 151477998
+              changed_attributes:
+                - permission
+              event: modified
+            decoder:
+              name: syscheck_integrity_changed
+            location: syscheck
+    """  # noqa: W505 RUF100
     alert = request.json
     log.info('Received new alert')
     if 'rule' in alert:
         log.debug(alert['rule']['description'])
     await handle_alert(alert)
+    return empty(200)
+
+
+@bp_manager.get('/condition')
+async def get_condition(request: Request) -> HTTPResponse:
+    """Retrieve a condition.
+
+    openapi:
+    ---
+    operationId: getCondition
+    parameters:
+      - name: id
+        in: query
+        description: The condition's ID.
+        required: true
+        schema:
+          type: integer
+          example: 123
+    responses:
+      '200':
+        description: The condition object.
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - identifier
+                - params
+                - args
+                - query
+                - checks
+              properties:
+                  identifier:
+                    type: integer
+                    description: The identifier.
+                    example: 123
+                  params:
+                    type: object
+                    description: The parameters.
+                    properties:
+                      ^([a-zA-Z_])+$:
+                        description: A key-value parameter pair.
+                        example: 192.168.1.1
+                  args:
+                    type: object
+                    description: The arguments.
+                    properties:
+                      ^([a-zA-Z_])+$:
+                        type: string
+                        description: A key-alert key argument pair.
+                        example: alert.device.ip_address
+                  query:
+                    type: string
+                    description: The query to run against the ISIM.
+                    example: MATCH (i:IP) RETURN i LIMIT 50
+                  checks:
+                    type: array
+                    description: The list of check codes.
+                    items:
+                      type: integer
+                      example: 1
+            example:
+              identifier: 123
+              params:
+                port: 22
+              args:
+                ip_address: alert.device.ip_address
+              query: "MATCH (i:IP) RETURN i LIMIT 50"
+              checks:
+                - 1
+                - 2
+      '404':
+        description: No condition with such ID was found.
+    """  # noqa: W505 RUF100
+    condition = await get_handler().retrieve_condition(int(request.args.get('id')))
+    return json(DatabaseHandler.to_dict(condition)) if condition is not None else empty(404)
+
+
+@bp_manager.post('/condition')
+async def post_condition(request: Request) -> HTTPResponse:
+    """Store a condition.
+
+    openapi:
+    ---
+    operationId: postCondition
+    requestBody:
+      description: The condition to store.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - identifier
+              - params
+              - args
+              - query
+              - checks
+            properties:
+                identifier:
+                  type: integer
+                  description: The identifier.
+                  example: 123
+                params:
+                  type: object
+                  description: The parameters.
+                  properties:
+                    ^([a-zA-Z_])+$:
+                      description: A key-value parameter pair.
+                      example: 192.168.1.1
+                args:
+                  type: object
+                  description: The arguments.
+                  properties:
+                    ^([a-zA-Z_])+$:
+                      type: string
+                      description: A key-alert key argument pair.
+                      example: alert.device.ip_address
+                query:
+                  type: string
+                  description: The query to run against the ISIM.
+                  example: MATCH (i:IP) RETURN i LIMIT 50
+                checks:
+                  type: array
+                  description: The list of check codes.
+                  items:
+                    type: integer
+                    example: 1
+          example:
+            identifier: 123
+            params:
+              port: 22
+            args:
+              ip_address: alert.device.ip_address
+            query: "MATCH (i:IP) RETURN i LIMIT 50"
+            checks:
+              - 1
+              - 2
+    responses:
+      '200':
+        description: Success
+    """  # noqa: W505 RUF100
+    condition = request.json
+    if condition is None:
+        return empty(400)
+    log.info('Parsing condition')
+    await get_handler().store_condition(Condition(condition['identifier'],
+                                                  condition['params'],
+                                                  condition['args'],
+                                                  condition['query'],
+                                                  [get_handler().CHECK_CODES[i] for i in condition['checks']]))
+    return empty(200)
+
+
+
+@bp_manager.get('/node')
+async def get_node(request: Request) -> HTTPResponse:
+    """Retrieve a node.
+
+    openapi:
+    ---
+    operationId: getNode
+    parameters:
+      - name: id
+        in: query
+        description: The node's ID.
+        required: true
+        schema:
+          type: integer
+          example: 123
+    responses:
+      '200':
+        description: The node object.
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - identifier
+                - technique
+                - conditions
+                - probabilities
+              properties:
+                identifier:
+                  type: integer
+                  description: The identifier.
+                  example: 123
+                technique:
+                  type: string
+                  description: The associated MITRE ATT&CK technique.
+                  example: T0001
+                conditions:
+                  type: array
+                  description: The list of condition IDs.
+                  items:
+                    type: integer
+                    example: 123
+                probabilities:
+                  type: array
+                  description: The history of probabilities.
+                  items:
+                    type: number
+                    format: float
+                    example: 0.77
+            example:
+              identifier: 123
+              technique: T0001
+              conditions:
+                - 456
+                - 789
+              probabilities:
+                - 0.1
+                - 0.5
+                - 0.44
+                - 0.98
+      '404':
+        description: No node with such ID was found.
+    """  # noqa: W505 RUF100
+    node = await get_handler().retrieve_node(int(request.args.get('id')))
+    return json(DatabaseHandler.to_dict(node)) if node is not None else empty(404)
+
+
+@bp_manager.post('/node')
+async def post_node(request: Request) -> HTTPResponse:
+    """Store a node.
+
+    openapi:
+    ---
+    operationId: postNode
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - identifier
+              - technique
+              - conditions
+              - probabilities
+            properties:
+              identifier:
+                type: integer
+                description: The identifier.
+                example: 123
+              technique:
+                type: string
+                description: The associated MITRE ATT&CK technique.
+                example: T0001
+              conditions:
+                type: array
+                description: The list of condition IDs.
+                items:
+                  type: integer
+                  example: 123
+              probabilities:
+                type: array
+                description: The history of probabilities.
+                items:
+                  type: number
+                  format: float
+                  example: 0.77
+          example:
+            identifier: 123
+            technique: T0001
+            conditions:
+              - 456
+              - 789
+            probabilities:
+              - 0.1
+              - 0.5
+              - 0.44
+              - 0.98
+    """  # noqa: W505 RUF100
+    node = request.json
+    log.info('Parsing node')
+    await get_handler().store_node(AttackNode(node['identifier'],
+                                              node['technique'],
+                                              [DummyCondition(c_id) for c_id in node['conditions']],
+                                              node['probabilities']))
     return empty(200)
