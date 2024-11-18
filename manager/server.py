@@ -48,6 +48,7 @@ async def shutdown_neo4j(app: Sanic):  # noqa: D103
 
 async def initialize_sqlite(app: Sanic):  # noqa: D103
     app.ctx.sqlite_db = await aiosqlite.connect(getenv('SQLITE_DB_PATH'))
+    app.ctx.sqlite_db.row_factory = aiosqlite.Row
     with Path('resources/init.sql').open() as f:
         script = f.read()
     c = await app.ctx.sqlite_db.cursor()
