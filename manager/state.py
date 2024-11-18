@@ -7,7 +7,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, LiteralString, TypeVar
 
 from manager import config
-from manager.model import AttackNode, Condition
+from manager.model import AttackNode, Condition, MitreTechnique, Workflow, WorkflowUrl
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
@@ -169,6 +169,56 @@ class DatabaseHandler:
         await self.connection.execute(query, parameters)
         await self.connection.commit()
 
+    async def _extract_workflow_parameters(self, row: Row) -> tuple[int,
+                                                                    LiteralString,
+                                                                    str,
+                                                                    WorkflowUrl,
+                                                                    list[MitreTechnique],
+                                                                    int]:
+        identifier = int(row['identifier'])
+        name = row['workflow_name']
+        desc = row['workflow_desc']
+        url = row['url']
+        effective_attacks = self._mklist(row['effective_attacks'], str)
+        cost = int(row['cost'])
+        return (identifier, name, desc, url, effective_attacks, cost)
+
+    async def retrieve_workflow(self, identifier: int) -> Workflow | None:
+        """Return the workflow specified by the identifier.
+
+        Returns `None` if the workflow can't be found.
+        """
+        query = """
+        SELECT identifier, workflow_name, workflow_desc, url, effective_attacks, cost
+        FROM Workflows
+        WHERE identifier = ?
+        """
+        parameters = (identifier,)
+        async with self.connection.execute(query, parameters) as cursor:
+            row = await cursor.fetchone()
+            if row is None:
+                return None
+            return Workflow(*await self._extract_workflow_parameters(row))
+
+    async def store_workflow(self, workflow: Workflow) -> None:
+        """Store a workflow.
+
+        The workflow's conditions don't have to be fully defined, they
+        just need to contain the proper identifier.
+        """
+        query = """
+        INSERT INTO Workflows
+        VALUES (?, ?, ?, ?, ?, ?)
+        """
+        parameters = (workflow.identifier,
+                      workflow.name,
+                      workflow.description,
+                      workflow.url,
+                      self._mkstr(workflow.effective_attacks),
+                      workflow.cost)
+        await self.connection.execute(query, parameters)
+        await self.connection.commit()
+
     async def retrieve_state(self) -> list[AttackNode]:
         """Return the list of current attack graphs.
 
@@ -278,6 +328,23 @@ class DatabaseHandler:
         """
         parameters = (self._mkstr([probability, node.probability, *node.probability_history]), node.identifier)
         await self.connection.execute(query, parameters)
+
+    async def retrieve_applicable_workflows(self, attack: MitreTechnique) -> list[Workflow]:
+        """Retrieve workflows able to mitigate a specific attack."""
+        query = """
+        SELECT identifier
+        FROM Workflows
+        WHERE effective_attacks LIKE '% ? %'
+        """
+        parameters = (attack,)
+
+        ret = []
+        async with self.connection.execute(query, parameters) as cursor:
+            async for row in cursor:
+                workflow = await self.retrieve_workflow(row['identifier'])
+                if workflow is not None:
+                    ret.append(workflow)
+        return ret
 
 
 async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list[AttackNode]]:

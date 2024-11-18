@@ -5,6 +5,8 @@ from math import fabs
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, LiteralString, get_args
 
+from aiohttp import ClientSession
+
 from manager import config
 from manager.isim import check_conditions
 
@@ -275,14 +277,31 @@ class AttackNode:
 
 class Workflow:
     def __init__(self,
+                 identifier: int,
                  name: LiteralString,
+                 description: str,
                  url: WorkflowUrl,
-                 mitigates: list[MitreTechnique],
-                 conditions: list[Condition]) -> None:
+                 effective_attacks: list[MitreTechnique],
+                 cost: int) -> None:
+        self.identifier = identifier
         self.name = name
+        self.description = description
         self.url = url
-        self.mitigates = mitigates
-        self.conditions = conditions
+        self.effective_attacks = effective_attacks
+        self.cost = cost
+
+        self.executed = False
+        self.results = None
+
+    async def execute(self) -> bool:
+        """Execute the workflow."""
+        async with ClientSession() as client, client.get(self.url) as response:
+            if response.status == 200:
+                self.results = await response.json()
+                self.executed = True
+            config.log.debug('Workflow request failed with status code %s', response.status)
+            config.log.debug(await response.text())
+        return self.executed
 
 
 class CVECondition(Condition):
