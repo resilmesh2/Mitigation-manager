@@ -69,12 +69,13 @@ class DatabaseHandler:
 
         Returns `None` if the condition can't be found.
         """
-        query = (
-            'SELECT args, query, check_function'
-            'FROM Conditions'
-            f'WHERE id = {identifier}'
-        )
-        async with self.connection.execute(query) as cursor:
+        query = """
+        SELECT identifier, params, args, query, checks
+        FROM Conditions
+        WHERE identifier = ?
+        """
+        parameters = (identifier,)
+        async with self.connection.execute(query, parameters) as cursor:
             row = await cursor.fetchone()
             if row is None:
                 return None
@@ -107,12 +108,13 @@ class DatabaseHandler:
         method does not return the full attack graph - the node's
         `prv` and `nxt` values will be `None`.
         """
-        query = (
-            'SELECT technique, conditions, probabilities, description'
-            'FROM AttackNodes'
-            f'WHERE id = {identifier}'
-        )
-        async with self.connection.execute(query) as cursor:
+        query = """
+        SELECT technique, conditions, probabilities, description
+        FROM AttackNodes
+        WHERE identifier = ?
+        """
+        parameters = (identifier,)
+        async with self.connection.execute(query, parameters) as cursor:
             row = await cursor.fetchone()
             if row is None:
                 return None
@@ -124,7 +126,10 @@ class DatabaseHandler:
         The node's conditions don't have to be fully defined, they
         just need to contain the proper identifier.
         """
-        query = 'INSERT INTO AttackNodes VALUES (?, ?, ?, ?, ?, ?, ?)'
+        query = """
+        INSERT INTO AttackNodes
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """
         parameters = (node.identifier,
                       node.prv.identifier if node.prv is not None else None,
                       node.nxt.identifier if node.nxt is not None else None,
@@ -151,12 +156,12 @@ class DatabaseHandler:
         `prv` and `nxt` values will be `None`.
         """
         ret = []
-        query_get_initial_nodes = (
-            'SELECT id, technique, conditions, probabilities, description'
-            'FROM AttackGraphs'
-            'WHERE taking_place = TRUE'
-        )
-        async with self.connection.execute(query_get_initial_nodes) as cursor:
+        query = """
+        SELECT identifier, technique, conditions, probabilities, description
+        FROM AttackGraphs
+        WHERE taking_place = TRUE
+        """
+        async with self.connection.execute(query) as cursor:
             async for row in cursor:
                 ret.append(AttackNode(*await self._extract_node_parameters(row)))
         return ret
@@ -165,16 +170,16 @@ class DatabaseHandler:
         """Return an initial node's complete attack graph."""
         final_node = initial_node
         nxt = initial_node.identifier
-        query_initial = (
-            'SELECT *'
-            'FROM AttackNodes'
-            'WHERE id = ?'
-        )
-        query_recursive = (
-            'SELECT *'
-            'FROM AttackNodes'
-            'WHERE prv = ?'
-        )
+        query_initial = """
+        SELECT *
+        FROM AttackNodes
+        WHERE identifier = ?
+        """
+        query_recursive = """
+        SELECT *
+        FROM AttackNodes
+        WHERE prv = ?
+        """
         q = query_initial
         while True:
             async with self.connection.execute(q, (nxt,)) as cursor:
@@ -193,12 +198,12 @@ class DatabaseHandler:
     async def retrieve_potential_graphs(self, technique: str) -> list[AttackNode]:
         """Return a list of potential new attack graphs."""
         ret = []
-        query = (
-            'SELECT an.id AS identifier'
-            'FROM AttackNodes AS an'
-            'INNER JOIN AttackGraphs AS ag ON an.id = ag.starting_node'
-            'WHERE an.technique = ?'
-        )
+        query = """
+        SELECT an.identifier
+        FROM AttackNodes AS an
+        INNER JOIN AttackGraphs AS ag ON an.identifier = ag.starting_node
+        WHERE an.technique = ?
+        """
         parameters = (technique,)
         async with self.connection.execute(query, parameters) as cursor:
             async for row in cursor:
@@ -214,21 +219,21 @@ class DatabaseHandler:
         If there is a next node, mark it as the new attack front.
         """
         tasks = []
-        query = (
-            'UPDATE AttackNodes'
-            'SET ongoing = 0'
-            'WHERE id = ?'
-        )
+        query = """
+        UPDATE AttackNodes
+        SET ongoing = 0
+        WHERE identifier = ?
+        """
         parameters = (node.identifier,)
         tasks.append(self.connection.execute(query, parameters))
 
         nxt = node.nxt
         if nxt is not None:
-            query = (
-                'UPDATE AttackNodes'
-                'SET ongoing = 1'
-                'WHERE id = ?'
-            )
+            query = """
+            UPDATE AttackNodes
+            SET ongoing = 1
+            WHERE identifier = ?
+            """
             parameters = (nxt.identifier,)
             tasks.append(self.connection.execute(query, parameters))
 
@@ -237,11 +242,11 @@ class DatabaseHandler:
 
     async def update_probability(self, node: AttackNode, probability: float):
         """Update the probability of a node."""
-        query = (
-            'UPDATE Probabilities'
-            'SET probabilities = ?'
-            'WHERE id = ?'
-        )
+        query = """
+        UPDATE Probabilities
+        SET probabilities = ?
+        WHERE identifier = ?
+        """
         parameters = (self._mkstr([probability, node.probability, *node.probability_history]), node.identifier)
         await self.connection.execute(query, parameters)
 
