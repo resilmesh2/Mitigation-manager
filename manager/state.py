@@ -292,16 +292,17 @@ class DatabaseHandler:
                     return final_node.first()
             q = query_recursive.format(nxt)
 
-    async def retrieve_potential_graphs(self, technique: str) -> list[AttackNode]:
+    async def retrieve_potential_graphs(self, attacks: list[MitreTechnique]) -> list[AttackNode]:
         """Return a list of potential new attack graphs."""
         ret = []
         query = """
-        SELECT an.identifier
+        SELECT an.identifier AS identifier
         FROM AttackNodes AS an
         INNER JOIN AttackGraphs AS ag ON an.identifier = ag.initial_node
         WHERE ag.ongoing = FALSE
         """
-        parameters = (technique,)
+        query += f'\nAND ({" OR ".join("an.technique LIKE ?" for _ in attacks)})'
+        parameters = (*[f'%{attack}%' for attack in attacks],)
         async with self.connection.execute(query, parameters) as cursor:
             async for row in cursor:
                 node = await self.retrieve_node(row['identifier'])
