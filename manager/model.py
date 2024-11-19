@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 WorkflowUrl = str
 MitreTechnique = str
-JsonPrimitive = str | int | float | bool
+JsonPrimitive = str | int | float | bool | list
 
 
 class Alert(SimpleNamespace):
@@ -25,6 +25,9 @@ class Alert(SimpleNamespace):
     TRANSLATIONS = {  # noqa: RUF012
         'rule': {
             'id': 'rule_id',
+            'mitre': {
+                'id': 'rule_mitre_ids',
+            },
         },
         'syscheck': {
             'sha1_after': 'file_hash',
