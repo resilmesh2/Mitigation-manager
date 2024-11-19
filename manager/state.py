@@ -422,14 +422,20 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
 
     completed: list[AttackNode] = []
     # 1: Advance local state if necessary.
+    log.debug('Advancing local state for %s nodes', len(state))
     for node in state:
         _next = node.nxt
         if _next is None:
             # Attack finished, but we might want to mitigate the
             # attack tree.  Keep it for now.
+            log.debug('Attack graph with starting node ID %s was completed by this alert',
+                      node.first().identifier)
             completed.append(node.first())
             continue
         if alert.rule_id == _next.technique:
+            log.debug('Advancing state for node ID %s (to node ID %s)',
+                      node.identifier,
+                      _next.identifier)
             tasks.append(get_handler().mark_complete(node))
             new_state.append(_next)
             old_state.append(node)
@@ -449,11 +455,15 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
                   if p])
 
     # Run all DB updates
+    log.debug('Running %s DB tasks...', len(tasks))
     await gather(*tasks)
+    log.debug('DB tasks executed')
 
     # Update local state
     (state.remove(n) for n in old_state)
     state.extend(new_state)
+
+    log.debug('Updated local state now contains %s attack node/s', len(state))
 
     for node in state:
         # Past: judge based on risk history
