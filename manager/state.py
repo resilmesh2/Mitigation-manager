@@ -435,7 +435,8 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
             old_state.append(node)
 
     # 2: Add new attack graphs to the local state
-    new_attack_graphs = await get_handler().retrieve_new_attack_graphs(alert.rule_id)
+    new_attack_graphs = await get_handler().retrieve_potential_graphs(alert.rule_mitre_ids)
+    log.debug('Retrieved %s new attack graphs', len(new_attack_graphs))
     new_state.extend(new_attack_graphs)
     tasks.extend([get_handler().update_new_attack_graph(n)
                   for n in new_attack_graphs])
