@@ -10,6 +10,7 @@ from manager.tasks import handle_alert
 bp_manager = Blueprint('manager')
 bg_manager = Blueprint.group(bp_manager)
 
+
 @bp_manager.get('/version')
 def version_endpoint(*_) -> HTTPResponse:
     """Return a JSON object with version information.
@@ -271,9 +272,9 @@ async def post_condition(request: Request) -> HTTPResponse:
                                                   condition['params'],
                                                   condition['args'],
                                                   condition['query'],
-                                                  [get_handler().CHECK_CODES[i] for i in condition['checks']]))
+                                                  [get_handler().CHECK_CODES[i]
+                                                   for i in condition['checks']]))
     return empty(200)
-
 
 
 @bp_manager.get('/node')
