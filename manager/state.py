@@ -148,7 +148,7 @@ class DatabaseHandler:
         `prv` and `nxt` values will be `None`.
         """
         query = """
-        SELECT technique, conditions, probabilities, description
+        SELECT identifier, technique, conditions, probabilities, description
         FROM AttackNodes
         WHERE identifier = ?
         """
