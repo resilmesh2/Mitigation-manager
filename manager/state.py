@@ -312,7 +312,9 @@ class DatabaseHandler:
     async def mark_complete(self, node: AttackNode):
         """Mark the attack node as completed.
 
-        If there is a next node, mark it as the new attack front.
+        If there is a next node, mark it as the new attack front.  If
+        there is no next node, mark the attack graph as no longer
+        taking place.
         """
         tasks = []
         query = """
@@ -331,6 +333,14 @@ class DatabaseHandler:
             WHERE identifier = ?
             """
             parameters = (nxt.identifier,)
+            tasks.append(self.connection.execute(query, parameters))
+        else:
+            query = """
+            UPDATE AttackGraphs
+            SET ongoing = FALSE
+            WHERE initial_node = ?
+            """
+            parameters = (node.first().identifier,)
             tasks.append(self.connection.execute(query, parameters))
 
         await asyncio.gather(*tasks)
