@@ -168,11 +168,14 @@ class AttackNode:
         self.technique = technique
         self.conditions = conditions
         self.probability_history = probability_history
-        self.probability = probability_history[-1] if len(probability_history) > 0 else 0.0
 
         self._cache_flat_map = None
         self._cache_all_before = None
         self._cache_all_after = None
+
+    @property
+    def probability(self) -> float:
+        return self.probability_history[-1] if len(self.probability_history) > 0 else 0.0
 
     def first(self) -> AttackNode:
         """Select the first node in the attack graph."""
@@ -239,15 +242,17 @@ class AttackNode:
                                  ) -> bool:
         """Recalculates the probability of the node being executed."""
         # Factor 3 is proportional to how many conditions have been
-        # met.
-        factor_3 = [await c.check(alert) for c in self.conditions].count(True) / len(self.conditions)
+        # met.  If there are no conditions, this value is 1.
+        factor_3 = (1.0
+                    if len(self.conditions) == 0
+                    else ([await c.check(alert) for c in self.conditions].count(True) / len(self.conditions)))
 
         old = self.probability
-        new = self._factor_1() * self._factor_2() * factor_3
-        if fabs(self.probability - old) < epsilon:
+        new = (self._factor_1() + self._factor_2() + factor_3) / 3
+        if fabs(old - new) < epsilon:
+            config.log.debug('Skipping probability update of node %s (no meaningful change)', self.identifier)
             return False
-        self.probability_history.append(old)
-        self.probability = new
+        self.probability_history.append(new)
         return True
 
     def historically_risky(self) -> float:
