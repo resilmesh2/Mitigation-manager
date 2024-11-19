@@ -374,6 +374,46 @@ class DatabaseHandler:
                     ret.append(workflow)
         return ret
 
+    async def retrieve_new_attack_graphs(self, attack: MitreTechnique) -> list[AttackNode]:
+        """Retrieve initial nodes from new attack graphs.
+
+        An attack graph is new if it is not already ongoing, but whose
+        initial node has been executed.
+        """
+        query = """
+        SELECT an.identifier, an.technique, an.conditions, an.probabilities, an.description
+        FROM AttackGraphs AS ag
+        INNER JOIN AttackNodes AS an ON an.identifier = ag.starting_node
+        WHERE ag.taking_place = FALSE
+        """
+        parameters = (attack,)
+        ret = []
+
+        async with self.connection.execute(query, parameters) as cursor:
+            async for row in cursor:
+                ret.append(AttackNode(*await self._extract_node_parameters(row)))
+        return ret
+
+    async def update_new_attack_graph(self, node: AttackNode):
+        """Mark attack graph as having started taking place."""
+        tasks = []
+        query = """
+        UPDATE AttackGraphs
+        SET taking_place = TRUE
+        WHERE initial_node = ?
+        """
+        parameters = (node.identifier,)
+        tasks.append(self.connection.execute(query, parameters))
+
+        query = """
+        UPDATE AttackNodes
+        SET ongoing = TRUE
+        WHERE identifier = ?
+        """
+        tasks.append(self.connection.execute(query, parameters))
+        await asyncio.gather(*tasks)
+        await self.connection.commit()
+
 
 async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list[AttackNode]]:
     """Update the local state with an alert.
