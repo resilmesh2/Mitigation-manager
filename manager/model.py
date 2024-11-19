@@ -225,7 +225,7 @@ class AttackNode:
                   ease_impact: float = config.EASE_IMPACT) -> float:
         """Return the second factor used in calculating probability.
 
-        Factor 3 is proportional to how easy it is to complete an
+        Factor 2 is proportional to how easy it is to complete an
         attack graph (read as: the less preconditions an attack has in
         total, the easier it is to do).
         """
