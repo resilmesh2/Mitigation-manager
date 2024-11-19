@@ -38,6 +38,7 @@ class Alert(SimpleNamespace):
             'dst_ip': 'connection_dst_ip',
             'src_port': 'connection_src_port',
             'dst_port': 'connection_dst_port',
+            'pid': 'connection_pid',
         },
     }
 
