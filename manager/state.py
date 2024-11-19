@@ -36,7 +36,6 @@ def get_handler() -> DatabaseHandler:
 
 
 class DatabaseHandler:
-
     CHECK_CODES = MappingProxyType({
         1: Condition.check_all_params_in_all_rows,
         2: Condition.check_all_params_in_any_row,
@@ -73,6 +72,17 @@ class DatabaseHandler:
                 'conditions': [c.identifier for c in item.conditions],
                 'probabilities': item.probability_history,
                 'description': None,
+            }
+        if type(item) is Workflow:
+            return {
+                'identifier': item.identifier,
+                'name': item.name,
+                'description': item.description,
+                'url': item.url,
+                'effective_attacks': item.effective_attacks,
+                'cost': item.cost,
+                'params': item.params,
+                'args': item.args,
             }
         return None
 
