@@ -447,7 +447,13 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
             new_state.append(_next)
             old_state.append(node)
 
-    # 2: Update probability percentages.
+    # 2: Add new attack graphs to the local state
+    new_attack_graphs = await get_handler().retrieve_new_attack_graphs(alert.rule_id)
+    new_state.extend(new_attack_graphs)
+    tasks.extend([get_handler().update_new_attack_graph(n)
+                  for n in new_attack_graphs])
+
+    # 3: Update probability percentages.
     tasks.extend([get_handler().update_probability(n, p)
                   for n, p in [(n, await n.update_probability(alert))
                                for node in state for n in node.all()]
