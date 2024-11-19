@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, LiteralString, TypeVar
 
 from manager import config
 from manager.model import AttackNode, Condition, MitreTechnique, Workflow, WorkflowUrl
+from manager.config import log
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
@@ -153,6 +154,7 @@ class DatabaseHandler:
         WHERE identifier = ?
         """
         parameters = (identifier,)
+        log.debug('Retrieving node ID %s', identifier)
         async with self.connection.execute(query, parameters) as cursor:
             row = await cursor.fetchone()
             if row is None:
@@ -169,6 +171,7 @@ class DatabaseHandler:
         INSERT INTO AttackNodes
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """
+        log.debug('Storing node ID %s', node.identifier)
         parameters = (node.identifier,
                       node.prv.identifier if node.prv is not None else None,
                       node.nxt.identifier if node.nxt is not None else None,
@@ -233,6 +236,7 @@ class DatabaseHandler:
                       workflow.cost,
                       dumps(workflow.params),
                       dumps(workflow.args))
+        log.debug('Storing workflow ID %s', workflow.identifier)
         await self.connection.execute(query, parameters)
         await self.connection.commit()
 
