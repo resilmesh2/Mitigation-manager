@@ -306,9 +306,10 @@ class Workflow(_UsesAlertParameters):
         self.executed = False
         self.results = None
 
-    async def execute(self) -> bool:
+    async def execute(self, alert: Alert) -> bool:
         """Execute the workflow."""
-        async with ClientSession() as client, client.get(self.url) as response:
+        body = self.parameters(alert)
+        async with ClientSession() as client, client.post(self.url, json=body) as response:
             if response.status == 200:
                 self.results = await response.json()
                 self.executed = True
