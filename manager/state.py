@@ -208,6 +208,7 @@ class DatabaseHandler:
         WHERE identifier = ?
         """
         parameters = (identifier,)
+        log.debug('Retrieving workflow ID %s', identifier)
         async with self.connection.execute(query, parameters) as cursor:
             row = await cursor.fetchone()
             if row is None:
@@ -254,7 +255,7 @@ class DatabaseHandler:
         query = """
         SELECT an.identifier, an.technique, an.conditions, an.probabilities, an.description
         FROM AttackGraphs AS ag
-        INNER JOIN AttackNodes AS an ON an.identifier = ag.starting_node
+        INNER JOIN AttackNodes AS an ON an.identifier = ag.initial_node
         WHERE ag.ongoing = TRUE
         """
         async with self.connection.execute(query) as cursor:
@@ -297,8 +298,8 @@ class DatabaseHandler:
         query = """
         SELECT an.identifier
         FROM AttackNodes AS an
-        INNER JOIN AttackGraphs AS ag ON an.identifier = ag.starting_node
-        WHERE an.technique = ?
+        INNER JOIN AttackGraphs AS ag ON an.identifier = ag.initial_node
+        WHERE ag.ongoing = FALSE
         """
         parameters = (technique,)
         async with self.connection.execute(query, parameters) as cursor:
