@@ -317,7 +317,7 @@ class DatabaseHandler:
         tasks = []
         query = """
         UPDATE AttackNodes
-        SET ongoing = 0
+        SET ongoing = FALSE
         WHERE identifier = ?
         """
         parameters = (node.identifier,)
@@ -327,7 +327,7 @@ class DatabaseHandler:
         if nxt is not None:
             query = """
             UPDATE AttackNodes
-            SET ongoing = 1
+            SET ongoing = TRUE
             WHERE identifier = ?
             """
             parameters = (nxt.identifier,)
