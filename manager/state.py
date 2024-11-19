@@ -362,9 +362,9 @@ class DatabaseHandler:
         query = """
         SELECT identifier
         FROM Workflows
-        WHERE effective_attacks LIKE '% ? %'
+        WHERE effective_attacks LIKE ?
         """
-        parameters = (attack,)
+        parameters = (f'%{attack}%',)
 
         ret = []
         async with self.connection.execute(query, parameters) as cursor:
