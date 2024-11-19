@@ -255,7 +255,7 @@ class DatabaseHandler:
         SELECT an.identifier, an.technique, an.conditions, an.probabilities, an.description
         FROM AttackGraphs AS ag
         INNER JOIN AttackNodes AS an ON an.identifier = ag.starting_node
-        WHERE ag.taking_place = TRUE
+        WHERE ag.ongoing = TRUE
         """
         async with self.connection.execute(query) as cursor:
             async for row in cursor:
@@ -384,7 +384,7 @@ class DatabaseHandler:
         SELECT an.identifier, an.technique, an.conditions, an.probabilities, an.description
         FROM AttackGraphs AS ag
         INNER JOIN AttackNodes AS an ON an.identifier = ag.starting_node
-        WHERE ag.taking_place = FALSE
+        WHERE ag.ongoing = FALSE
         """
         parameters = (attack,)
         ret = []
@@ -399,7 +399,7 @@ class DatabaseHandler:
         tasks = []
         query = """
         UPDATE AttackGraphs
-        SET taking_place = TRUE
+        SET ongoing = TRUE
         WHERE initial_node = ?
         """
         parameters = (node.identifier,)
