@@ -61,7 +61,40 @@ class Alert(SimpleNamespace):
                 setattr(self, d[f], a[f])
 
 
-class Condition:
+class _UsesAlertParameters:
+    def __init__(self,
+                 params: dict[str, JsonPrimitive],
+                 args: dict[str, str | list[str]],
+                 ) -> None:
+        self.params = params
+        self.args = args
+
+    def parameters(self, alert: Alert) -> dict[str, JsonPrimitive] | None:
+        """Return a dict containing parameters and their values."""
+        ret = {}
+        for key, value in self.args.items():
+            if key in ret:
+                continue
+            if type(value) is str:
+                if hasattr(alert, value):
+                    ret[key] = getattr(alert, value)
+                else:
+                    # If the alert doesn't have the required query
+                    # field, abort
+                    return None
+            if type(value) is list:
+                for v in value:
+                    if hasattr(alert, v):
+                        ret[key] = getattr(alert, v)
+                        break
+                if key not in ret:
+                    # If the alert doesn't have at least one of the
+                    # optional query fields, abort
+                    return None
+        return self.params | ret
+
+
+class Condition(_UsesAlertParameters):
     def __init__(self,
                  identifier: int,
                  params: dict[str, JsonPrimitive],
@@ -69,9 +102,8 @@ class Condition:
                  query: LiteralString,
                  checks: list[Callable[[list[Record], dict[str, JsonPrimitive]], bool]],
                  ) -> None:
+        super().__init__(params, args)
         self.identifier = identifier
-        self.params = params
-        self.args = args
         self.query: LiteralString = query
         self.checks = checks
 
@@ -103,30 +135,6 @@ class Condition:
     def check_all_params_in_all_rows(records: list[Record], params: dict[str, JsonPrimitive]) -> bool:
         """Return true only if all rows match all parameters."""
         return Condition._check_row_params(records, params, all, all)
-
-    def parameters(self, alert: Alert) -> dict[str, JsonPrimitive] | None:
-        """Return a dict containing parameters and their values."""
-        ret = {}
-        for key, value in self.args.items():
-            if key in ret:
-                continue
-            if type(value) is str:
-                if hasattr(alert, value):
-                    ret[key] = getattr(alert, value)
-                else:
-                    # If the alert doesn't have the required query
-                    # field, abort
-                    return None
-            if type(value) is list:
-                for v in value:
-                    if hasattr(alert, v):
-                        ret[key] = getattr(alert, v)
-                        break
-                if key not in ret:
-                    # If the alert doesn't have at least one of the
-                    # optional query fields, abort
-                    return None
-        return self.params | ret
 
     async def check(self, alert: Alert) -> bool:
         """Query the ISIM and check whether the condition is true."""
@@ -276,14 +284,18 @@ class AttackNode:
         return self.all_before() | {self} | self.all_after()
 
 
-class Workflow:
+class Workflow(_UsesAlertParameters):
     def __init__(self,
                  identifier: int,
                  name: LiteralString,
                  description: str,
                  url: WorkflowUrl,
                  effective_attacks: list[MitreTechnique],
-                 cost: int) -> None:
+                 cost: int,
+                 params: dict[str, JsonPrimitive],
+                 args: dict[str, str | list[str]],
+                 ) -> None:
+        super().__init__(params, args)
         self.identifier = identifier
         self.name = name
         self.description = description
