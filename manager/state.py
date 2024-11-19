@@ -353,7 +353,8 @@ class DatabaseHandler:
         SET probabilities = ?
         WHERE identifier = ?
         """
-        parameters = (self._mkstr([probability, node.probability, *node.probability_history]), node.identifier)
+        parameters = (self._mkstr([probability, node.probability, *node.probability_history]),
+                      node.identifier)
         await self.connection.execute(query, parameters)
 
     async def retrieve_applicable_workflows(self, attack: MitreTechnique) -> list[Workflow]:
