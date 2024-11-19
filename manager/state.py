@@ -184,14 +184,18 @@ class DatabaseHandler:
                                                                     str,
                                                                     WorkflowUrl,
                                                                     list[MitreTechnique],
-                                                                    int]:
+                                                                    int,
+                                                                    dict,
+                                                                    dict]:
         identifier = int(row['identifier'])
         name = row['workflow_name']
         desc = row['workflow_desc']
         url = row['url']
         effective_attacks = self._mklist(row['effective_attacks'], str)
         cost = int(row['cost'])
-        return (identifier, name, desc, url, effective_attacks, cost)
+        params = loads(row['params'])
+        args = loads(row['args'])
+        return (identifier, name, desc, url, effective_attacks, cost, params, args)
 
     async def retrieve_workflow(self, identifier: int) -> Workflow | None:
         """Return the workflow specified by the identifier.
@@ -199,7 +203,7 @@ class DatabaseHandler:
         Returns `None` if the workflow can't be found.
         """
         query = """
-        SELECT identifier, workflow_name, workflow_desc, url, effective_attacks, cost
+        SELECT identifier, workflow_name, workflow_desc, url, effective_attacks, cost, params, args
         FROM Workflows
         WHERE identifier = ?
         """
@@ -218,14 +222,16 @@ class DatabaseHandler:
         """
         query = """
         INSERT INTO Workflows
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """
         parameters = (workflow.identifier,
                       workflow.name,
                       workflow.description,
                       workflow.url,
                       self._mkstr(workflow.effective_attacks),
-                      workflow.cost)
+                      workflow.cost,
+                      dumps(workflow.params),
+                      dumps(workflow.args))
         await self.connection.execute(query, parameters)
         await self.connection.commit()
 
