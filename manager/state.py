@@ -333,8 +333,8 @@ class DatabaseHandler:
             parameters = (nxt.identifier,)
             tasks.append(self.connection.execute(query, parameters))
 
-        tasks.append(self.connection.commit())
         await asyncio.gather(*tasks)
+        await self.connection.commit()
 
     async def update_probability(self, node: AttackNode, probability: float):
         """Update the probability of a node."""
