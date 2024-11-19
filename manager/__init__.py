@@ -3,7 +3,7 @@ from asyncio import Condition
 from sanic import Blueprint, HTTPResponse, Request, json, empty
 
 from manager.config import log, version
-from manager.model import AttackNode, Condition, DummyCondition
+from manager.model import AttackNode, Condition, DummyCondition, Workflow
 from manager.state import DatabaseHandler, get_handler
 from manager.tasks import handle_alert
 
@@ -401,4 +401,181 @@ async def post_node(request: Request) -> HTTPResponse:
                                               node['technique'],
                                               [DummyCondition(c_id) for c_id in node['conditions']],
                                               node['probabilities']))
+    return empty(200)
+
+
+@bp_manager.get('/workflow')
+async def get_workflow(request: Request) -> HTTPResponse:
+    """Retrieve a workflow.
+
+    openapi:
+    ---
+    operationId: getWorkflow
+    parameters:
+      - name: id
+        in: query
+        description: The workflow's ID.
+        required: true
+        schema:
+          type: integer
+          example: 123
+    responses:
+      '200':
+        description: The workflow object.
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - identifier
+                - name
+                - description
+                - url
+                - effective_attacks
+                - cost
+                - params
+                - args
+              properties:
+                identifier:
+                  type: integer
+                  description: The identifier.
+                  example: 123
+                name:
+                  type: string
+                  description: The name of the workflow.
+                  example: delete_file
+                description:
+                  type: string
+                  description: The workflow description
+                  example: Deletes a file.
+                url:
+                  type: string
+                  description: An URL pointing to the workflow.
+                  example: https://workflows.example.org/execute/123-456-789
+                effective_attacks:
+                  type: array
+                  description: The list of MITRE ATT&CK identifiers this workflow can mitigate.
+                  items:
+                    type: string
+                    example: T0000
+                cost:
+                  type: int
+                  description: The cost of applying this workflow.
+                  example: 10
+                params:
+                  type: object
+                  description: The parameters.
+                  properties:
+                    ^([a-zA-Z_])+$:
+                      description: A key-value parameter pair.
+                      example: 192.168.1.1
+                args:
+                  type: object
+                  description: The arguments.
+                  properties:
+                    ^([a-zA-Z_])+$:
+                      type: string
+                      description: A key-alert key argument pair.
+                      example: alert.device.ip_address
+            example:
+              identifier: 123
+              name: delete_file
+              description: Deletes a file.
+              url: https://workflows.example.org/execute/123-456-789
+              effective_attacks:
+                - T0001
+                - T0002.1
+                - T0002.2
+              cost: 10
+      '404':
+        description: No workflow with such ID was found.
+    """  # noqa: W505 RUF100
+    workflow = await get_handler().retrieve_workflow(int(request.args.get('id')))
+    return json(DatabaseHandler.to_dict(workflow)) if workflow is not None else empty(404)
+
+
+@bp_manager.post('/workflow')
+async def post_workflow(request: Request) -> HTTPResponse:
+    """Store a workflow.
+
+    openapi:
+    ---
+    operationId: postWorkflow
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - identifier
+              - name
+              - description
+              - url
+              - effective_attacks
+              - cost
+              - params
+              - args
+            properties:
+              identifier:
+                type: integer
+                description: The identifier.
+                example: 123
+              name:
+                type: string
+                description: The name of the workflow.
+                example: delete_file
+              description:
+                type: string
+                description: The workflow description
+                example: Deletes a file.
+              url:
+                type: string
+                description: An URL pointing to the workflow.
+                example: https://workflows.example.org/execute/123-456-789
+              effective_attacks:
+                type: array
+                description: The list of MITRE ATT&CK identifiers this workflow can mitigate.
+                items:
+                  type: string
+                  example: T0000
+              cost:
+                type: int
+                description: The cost of applying this workflow.
+                example: 10
+              params:
+                type: object
+                description: The parameters.
+                properties:
+                  ^([a-zA-Z_])+$:
+                    description: A key-value parameter pair.
+                    example: 192.168.1.1
+              args:
+                type: object
+                description: The arguments.
+                properties:
+                  ^([a-zA-Z_])+$:
+                    type: string
+                    description: A key-alert key argument pair.
+                    example: alert.device.ip_address
+          example:
+            identifier: 123
+            name: delete_file
+            description: Deletes a file.
+            url: https://workflows.example.org/execute/123-456-789
+            effective_attacks:
+              - T0001
+              - T0002.1
+              - T0002.2
+            cost: 10
+    """  # noqa: W505 RUF100
+    workflow = request.json
+    log.info('Parsing workflow')
+    await get_handler().store_workflow(Workflow(workflow['identifier'],
+                                                workflow['name'],
+                                                workflow['description'],
+                                                workflow['url'],
+                                                workflow['effective_attacks'],
+                                                workflow['cost'],
+                                                workflow['params'],
+                                                workflow['args']))
     return empty(200)
