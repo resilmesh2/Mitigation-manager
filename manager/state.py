@@ -46,12 +46,12 @@ class DatabaseHandler:
     T = TypeVar('T')
 
     @staticmethod
-    def _mkstr(_list: list[T], f: Callable[[T], str] = str) -> str:
-        return ' '.join(f(e) for e in _list)
+    def _mkstr(_list: list[T], f: Callable[[T], str] = str) -> str | None:
+        return ' '.join(f(e) for e in _list) if len(_list) > 0 else None
 
     @staticmethod
-    def _mklist(_list: str, f: Callable[[str], T]) -> list[T]:
-        return [f(e) for e in _list.split(' ')]
+    def _mklist(_list: str | None, f: Callable[[str], T]) -> list[T]:
+        return [f(e) for e in _list.split(' ')] if _list is not None else []
 
     @staticmethod
     def to_dict(item) -> dict | None:
