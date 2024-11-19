@@ -252,9 +252,10 @@ class DatabaseHandler:
         """
         ret = []
         query = """
-        SELECT identifier, technique, conditions, probabilities, description
-        FROM AttackGraphs
-        WHERE taking_place = TRUE
+        SELECT an.identifier, an.technique, an.conditions, an.probabilities, an.description
+        FROM AttackGraphs AS ag
+        INNER JOIN AttackNodes AS an ON an.identifier = ag.starting_node
+        WHERE ag.taking_place = TRUE
         """
         async with self.connection.execute(query) as cursor:
             async for row in cursor:
