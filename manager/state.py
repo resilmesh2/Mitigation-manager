@@ -270,31 +270,34 @@ class DatabaseHandler:
     async def _retrieve_full_graph(self, initial_node: AttackNode) -> AttackNode:
         """Return an initial node's complete attack graph."""
         final_node = initial_node
-        nxt = initial_node.identifier
-        query_initial = """
+        query_for_first_nxt = """
+        SELECT nxt
+        FROM AttackNodes
+        WHERE identifier = ?
+        """
+        async with self.connection.execute(query_for_first_nxt, (initial_node.identifier,)) as cursor:
+            row = await cursor.fetchone()
+            if row is None:
+                return initial_node
+        nxt = row['nxt']
+        query = """
         SELECT *
         FROM AttackNodes
         WHERE identifier = ?
         """
-        query_recursive = """
-        SELECT *
-        FROM AttackNodes
-        WHERE prv = ?
-        """
-        q = query_initial
         while True:
-            async with self.connection.execute(q, (nxt,)) as cursor:
+            async with self.connection.execute(query, (nxt,)) as cursor:
                 if cursor.arraysize > 1:
                     msg = 'Multiple next nodes for attack node'
                     raise ValueError(msg)
                 row = await cursor.fetchone()
                 if row is None:
                     return final_node.first()
-                final_node = final_node.then(*await self._extract_node_parameters(row))
+                row_params = await self._extract_node_parameters(row)
+                final_node = final_node.then(*row_params)
                 nxt = row['nxt']
                 if nxt is None:
                     return final_node.first()
-            q = query_recursive.format(nxt)
 
     async def retrieve_potential_graphs(self, attacks: list[MitreTechnique]) -> list[AttackNode]:
         """Return a list of potential new attack graphs."""
