@@ -352,16 +352,17 @@ class DatabaseHandler:
         await asyncio.gather(*tasks)
         await self.connection.commit()
 
-    async def update_probability(self, node: AttackNode, probability: float):
+    async def update_probability(self, node: AttackNode):
         """Update the probability of a node."""
         query = """
-        UPDATE Probabilities
+        UPDATE AttackNodes
         SET probabilities = ?
         WHERE identifier = ?
         """
-        parameters = (self._mkstr([probability, node.probability, *node.probability_history]),
+        parameters = (self._mkstr(node.probability_history),
                       node.identifier)
         await self.connection.execute(query, parameters)
+        await self.connection.commit()
 
     async def retrieve_applicable_workflows(self, attack: MitreTechnique) -> list[Workflow]:
         """Retrieve workflows able to mitigate a specific attack."""
@@ -439,11 +440,12 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
     tasks.extend([get_handler().update_new_attack_graph(n)
                   for n in new_attack_graphs])
 
-    # 3: Update probability percentages.
-    tasks.extend([get_handler().update_probability(n, p)
+    # 3: Update probability percentages
+    log.debug('Updating probabilities for all nodes')
+    tasks.extend([get_handler().update_probability(n)
                   for n, p in [(n, await n.update_probability(alert))
                                for node in state for n in node.all()]
-                  if p >= 0])
+                  if p])
 
     # Run all DB updates
     await gather(*tasks)
