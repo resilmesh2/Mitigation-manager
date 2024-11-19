@@ -136,8 +136,8 @@ class DatabaseHandler:
     async def _extract_node_parameters(self, row: Row) -> tuple[int, str, list[Condition], list[float]]:
         identifier = int(row['identifier'])
         technique: str = row['technique']
-        conditions = [await self.retrieve_condition(c) for c in self._mklist(row['condition'], int)]
-        probabilities = [float(p) for p in row['probabilities'].split(' ')]
+        conditions = [await self.retrieve_condition(c) for c in self._mklist(row['conditions'], int)]
+        probabilities = self._mklist(row['probabilities'], float)
         return (identifier, technique, [e for e in conditions if e is not None], probabilities)
 
     async def retrieve_node(self, identifier: int) -> AttackNode | None:
