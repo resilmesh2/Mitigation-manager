@@ -81,9 +81,19 @@ class Alert(SimpleNamespace):
                 msg = f'Alert attribute {attr} is not the correct type (expected {clazz}, got {t})'
                 raise InvalidAlertError(msg)
 
+    def has_mitre_attacks(self) -> bool:
+        """Check if the alert has any associated MITRE ATT&CK IDs."""
+        return hasattr(self, 'rule_mitre_ids') and len(self.rule_mitre_ids) > 0
+
     def satisfies(self, workflow: Workflow) -> bool:
         """Check if the alert satisfies the workflow parameters."""
         return workflow.parameters(self) is not None
+
+    def triggers(self, node: AttackNode) -> bool:
+        """Check if the alert triggers the attack node."""
+        if not self.has_mitre_attacks():
+            return False
+        return node.technique in self.rule_mitre_ids
 
 
 class _UsesAlertParameters:
