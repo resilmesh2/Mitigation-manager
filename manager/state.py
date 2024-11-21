@@ -441,10 +441,8 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
                       node.first().identifier)
             completed.append(node.first())
             continue
-        if alert.rule_id == _next.technique:
-            log.debug('Advancing state for node ID %s (to node ID %s)',
-                      node.identifier,
-                      _next.identifier)
+        if _next.technique in alert.rule_mitre_ids:
+            log.debug('Advancing state from node %s to %s', node.identifier, _next.identifier)
             tasks.append(get_handler().mark_complete(node))
             new_state.append(_next)
             old_state.append(node)
