@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-from asyncio import gather
 from json import dumps, loads
 from types import MappingProxyType
 from typing import TYPE_CHECKING, LiteralString, TypeVar
@@ -11,7 +9,7 @@ from manager.model import AttackNode, Condition, MitreTechnique, Workflow, Workf
 from manager.config import log
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Coroutine
+    from collections.abc import Callable
 
     from aiosqlite import Connection, Row
 
@@ -59,7 +57,8 @@ class DatabaseHandler:
         return [f(e) for e in _list.split(' ')] if _list is not None else []
 
     @staticmethod
-    def to_dict(item) -> dict | None:
+    def to_dict(item: Condition | AttackNode | Workflow) -> dict | None:
+        """Return a JSON-friendly representation of the item."""
         if type(item) is Condition:
             return {
                 'identifier': item.identifier,
@@ -133,9 +132,8 @@ class DatabaseHandler:
                                               dumps(condition.args),
                                               condition.query,
                                               checks))
-        await self.connection.commit()
 
-    async def _extract_node_parameters(self, row: Row) -> tuple[int, str, list[Condition], list[float]]:
+    async def _row_to_node_parameters(self, row: Row) -> tuple[int, str, list[Condition], list[float]]:
         identifier = int(row['identifier'])
         technique: str = row['technique']
         conditions = [await self.retrieve_condition(c) for c in self._mklist(row['conditions'], int)]
@@ -159,7 +157,7 @@ class DatabaseHandler:
             row = await cursor.fetchone()
             if row is None:
                 return None
-            return AttackNode(*await self._extract_node_parameters(row))
+            return AttackNode(*await self._row_to_node_parameters(row))
 
     async def store_node(self, node: AttackNode) -> None:
         """Store a node.
@@ -180,7 +178,6 @@ class DatabaseHandler:
                       self._mkstr([node.probability, *node.probability_history]),
                       'description')
         await self.connection.execute(query, parameters)
-        await self.connection.commit()
 
     async def _extract_workflow_parameters(self, row: Row) -> tuple[int,
                                                                     LiteralString,
@@ -236,7 +233,6 @@ class DatabaseHandler:
                       dumps(workflow.params),
                       dumps(workflow.args))
         await self.connection.execute(query, parameters)
-        await self.connection.commit()
 
     async def retrieve_state(self) -> list[AttackNode]:
         """Return the list of current attack graphs.
@@ -245,7 +241,7 @@ class DatabaseHandler:
         attack nodes, each linked to the previous/next nodes to form
         the attack graph.
         """
-        return [await self._retrieve_full_graph(n) for n in await self._retrieve_initial_nodes()]
+        return [await self.retrieve_full_graph(n) for n in await self._retrieve_initial_nodes()]
 
     async def _retrieve_initial_nodes(self) -> list[AttackNode]:
         """Return the list of initial nodes for active attack graphs.
@@ -255,24 +251,26 @@ class DatabaseHandler:
         """
         ret = []
         query = """
-        SELECT an.identifier, an.technique, an.conditions, an.probabilities, an.description
+        SELECT an.*
         FROM AttackGraphs AS ag
         INNER JOIN AttackNodes AS an ON an.identifier = ag.initial_node
-        WHERE ag.ongoing = TRUE
+        WHERE ag.attack_front IS NOT NULL
         """
         async with self.connection.execute(query) as cursor:
             async for row in cursor:
-                ret.append(AttackNode(*await self._extract_node_parameters(row)))
+                ret.append(AttackNode(*await self._row_to_node_parameters(row)))
         return ret
 
-    async def _retrieve_full_graph(self, initial_node: AttackNode) -> AttackNode:
+    async def retrieve_full_graph(self, initial_node: AttackNode) -> AttackNode:
         """Return an initial node's complete attack graph.
 
         The node returned is the ongoing node.  If none of the
         subsequent nodes are the ongoing node, returns `initial_node`.
+        This function modifies `initial_node`'s `nxt` value.
         """
+        # Retrieve the next node in the attack graph
         final_node = initial_node
-        attack_front = initial_node
+        ret = None
         query_for_first_nxt = """
         SELECT nxt
         FROM AttackNodes
@@ -283,6 +281,30 @@ class DatabaseHandler:
             if row is None:
                 return initial_node
         nxt = row['nxt']
+
+        # Retrieve the attack front
+        query_for_attack_front = """
+        SELECT attack_front
+        FROM AttackGraphs
+        WHERE initial_node = ?
+        """
+        async with self.connection.execute(query_for_attack_front, (initial_node.identifier,)) as cursor:
+            row = await cursor.fetchone()
+            if row is None:
+                msg = 'Initial node does not belong to an attack graph'
+                raise InvalidDatabaseStateError(msg)
+            attack_front = row['attack_front']
+
+        if attack_front is None or attack_front == initial_node.identifier:
+            ret = initial_node
+
+        # Edge case: graphs of length 1
+        if nxt is None:
+            # Set the initial node values just in case
+            initial_node.nxt = None
+            return attack_front
+
+        # Retrieve the remainder of the attack graph
         query = """
         SELECT *
         FROM AttackNodes
@@ -292,77 +314,66 @@ class DatabaseHandler:
             async with self.connection.execute(query, (nxt,)) as cursor:
                 if cursor.arraysize > 1:
                     msg = 'Multiple next nodes for attack node'
-                    raise ValueError(msg)
+                    raise InvalidDatabaseStateError(msg)
                 row = await cursor.fetchone()
                 if row is None:
                     return final_node.first()
-                row_params = await self._extract_node_parameters(row)
+                row_params = await self._row_to_node_parameters(row)
                 final_node = final_node.then(*row_params)
-                ongoing = row['ongoing'] == 1
-                if ongoing:
-                    if attack_front is not initial_node:  # Means attack_front was already set
-                        msg = 'Multiple ongoing nodes'
-                        raise ValueError(msg)
-                    attack_front = final_node
+                if attack_front == final_node.identifier:
+                    ret = final_node
                 nxt = row['nxt']
                 if nxt is None:
-                    return attack_front
+                    if ret is None:  # This should never happen
+                        msg = 'Attack front is neither None nor any of the nodes in the attack graph'
+                        raise InvalidDatabaseStateError(msg)
+                    return ret
 
-    async def retrieve_potential_graphs(self, attacks: list[MitreTechnique]) -> list[AttackNode]:
-        """Return a list of potential new attack graphs."""
+    async def retrieve_new_graphs(self, alert: Alert) -> list[AttackNode]:
+        """Return a list of eligible new attack graphs.
+
+        An attack graph is eligible if its initial node is triggered
+        by the given alert.
+        """
         ret = []
-        query = """
+        # Edge case: attackless alert
+        if not alert.has_mitre_attacks():
+            return ret
+        query_retrieve = """
         SELECT an.identifier AS identifier
         FROM AttackNodes AS an
         INNER JOIN AttackGraphs AS ag ON an.identifier = ag.initial_node
-        WHERE ag.ongoing = FALSE
+        WHERE ag.attack_front IS NULL
         """
-        query += f'\nAND ({" OR ".join("an.technique LIKE ?" for _ in attacks)})'
-        parameters = (*[f'%{attack}%' for attack in attacks],)
-        async with self.connection.execute(query, parameters) as cursor:
+        query_retrieve += f'AND ({" OR ".join("an.technique LIKE ?" for _ in alert.rule_mitre_ids)})'
+        parameters_retrieve = (*[f'%{attack}%' for attack in alert.rule_mitre_ids],)
+        async with self.connection.execute(query_retrieve, parameters_retrieve) as cursor:
             async for row in cursor:
                 node = await self.retrieve_node(row['identifier'])
                 if node is None:
-                    continue
+                    msg = 'Missing initial node'
+                    raise InvalidDatabaseStateError(msg)
+                node = await self.retrieve_full_graph(node)
                 ret.append(node)
         return ret
 
-    async def mark_complete(self, node: AttackNode):
+    async def mark_complete(self, node: AttackNode) -> bool:
         """Mark the attack node as completed.
 
-        If there is a next node, mark it as the new attack front.  If
-        there is no next node, mark the attack graph as no longer
-        taking place.
+        If there is a next node, mark it as the new attack front and
+        return `False`.  If there is no next node, mark the attack
+        graph as no longer taking place and return `True`.
         """
-        tasks = []
+        attack_front = None if node.nxt is None else node.nxt.identifier
+
         query = """
-        UPDATE AttackNodes
-        SET ongoing = FALSE
-        WHERE identifier = ?
+        UPDATE AttackGraphs
+        SET attack_front = ?
+        WHERE initial_node = ?
         """
-        parameters = (node.identifier,)
-        tasks.append(self.connection.execute(query, parameters))
-
-        nxt = node.nxt
-        if nxt is not None:
-            query = """
-            UPDATE AttackNodes
-            SET ongoing = TRUE
-            WHERE identifier = ?
-            """
-            parameters = (nxt.identifier,)
-            tasks.append(self.connection.execute(query, parameters))
-        else:
-            query = """
-            UPDATE AttackGraphs
-            SET ongoing = FALSE
-            WHERE initial_node = ?
-            """
-            parameters = (node.first().identifier,)
-            tasks.append(self.connection.execute(query, parameters))
-
-        await asyncio.gather(*tasks)
-        await self.connection.commit()
+        parameters = (attack_front, node.first().identifier)
+        await self.connection.execute(query, parameters)
+        return attack_front is None
 
     async def update_probability(self, node: AttackNode):
         """Update the probability of a node."""
@@ -374,7 +385,6 @@ class DatabaseHandler:
         parameters = (self._mkstr(node.probability_history),
                       node.identifier)
         await self.connection.execute(query, parameters)
-        await self.connection.commit()
 
     async def retrieve_applicable_workflows(self, attack: MitreTechnique) -> list[Workflow]:
         """Retrieve workflows able to mitigate a specific attack."""
@@ -393,26 +403,6 @@ class DatabaseHandler:
                     ret.append(workflow)
         return ret
 
-    async def update_new_attack_graph(self, node: AttackNode):
-        """Mark attack graph as having started taking place."""
-        tasks = []
-        query = """
-        UPDATE AttackGraphs
-        SET ongoing = TRUE
-        WHERE initial_node = ?
-        """
-        parameters = (node.identifier,)
-        tasks.append(self.connection.execute(query, parameters))
-
-        query = """
-        UPDATE AttackNodes
-        SET ongoing = TRUE
-        WHERE identifier = ?
-        """
-        tasks.append(self.connection.execute(query, parameters))
-        await asyncio.gather(*tasks)
-        await self.connection.commit()
-
 
 async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list[AttackNode]]:
     """Update the local state with an alert.
@@ -423,7 +413,6 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
     - Nodes further along in the active attack graphs.
     """
     state = await get_handler().retrieve_state()
-    tasks: list[Coroutine] = []
 
     new_state: list[AttackNode] = []
     old_state: list[AttackNode] = []
@@ -433,43 +422,42 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
     future: list[AttackNode] = []
 
     completed: list[AttackNode] = []
-    # 1: Advance local state if necessary.
+
+    log.debug('Attack front before retrieving new attack graphs: %s', [n.identifier for n in state])
+
+    # 1: Add new attack graphs to the local state
+    new_attack_graphs = await get_handler().retrieve_new_graphs(alert)
+    log.debug('Retrieved %s new attack graphs', len(new_attack_graphs))
+    state.extend(new_attack_graphs)
+
+    # 2: Advance local state if necessary.
     log.info('Advancing attack front')
     log.debug('Current attack front:  %s', [n.identifier for n in state])
     for node in state:
-        _next = node.nxt
-        if _next is None:
-            # Attack finished, but we might want to mitigate the
-            # attack tree.  Keep it for now.
-            log.debug('Attack graph with starting node %s was completed by this alert',
-                      node.first().identifier)
-            completed.append(node.first())
-            continue
-        if _next.technique in alert.rule_mitre_ids:
-            log.debug('Advancing state from node %s to %s', node.identifier, _next.identifier)
-            tasks.append(get_handler().mark_complete(node))
-            new_state.append(_next)
+        if alert.triggers(node):
+            await get_handler().mark_complete(node)
+            if node.nxt is not None:
+                log.debug('Advancing state from node %s to %s', node.identifier, node.nxt.identifier)
+                new_state.append(node.nxt)
+            else:
+                # Attack finished, but we might want to mitigate the
+                # attack tree.  Keep it for now.
+                log.debug('Attack graph with starting node %s was completed by this alert',
+                          node.first().identifier)
+                completed.append(node.first())
             old_state.append(node)
             continue
         log.debug('Node %s did not change state', node.identifier)
 
-    # 2: Add new attack graphs to the local state
-    new_attack_graphs = await get_handler().retrieve_potential_graphs(alert.rule_mitre_ids)
-    log.debug('Retrieved %s new attack graphs', len(new_attack_graphs))
-    new_state.extend(new_attack_graphs)
-    tasks.extend([get_handler().update_new_attack_graph(n)
-                  for n in new_attack_graphs])
-
     # 3: Update probability percentages
     log.debug('Updating probabilities')
-    tasks.extend([get_handler().update_probability(n)
-                  for n, p in [(n, await n.update_probability(alert))
-                               for node in state for n in node.all()]
-                  if p])
+    for n, p in [(n, await n.update_probability(alert)) for node in state for n in node.all()]:
+        if p:
+            await get_handler().update_probability(n)
 
     # Run all DB updates
-    log.debug('Running %s DB tasks', len(tasks))
-    await gather(*tasks)
+    log.debug('Committing changes to DB')
+    await get_handler().connection.commit()
 
     # Update local state
     for n in old_state:
