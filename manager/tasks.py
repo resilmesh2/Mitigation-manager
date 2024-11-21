@@ -20,15 +20,15 @@ async def handle_alert(alert: dict):
         mitigatable_nodes = await state.update(parsed_alert)
 
         # Step 2: Apply any necessary instant mitigations
-        log.info('Applying immediate mitigations for latest attack')
+        log.info('Applying immediate mitigations for latest attack (%s nodes)', len(mitigatable_nodes[1]))
         await _apply_immediate_mitigation(mitigatable_nodes[1], parsed_alert)
 
         # Step 3: Resolve any future mitigations
-        log.info('Applying immediate mitigations for potential future attacks')
+        log.info('Applying immediate mitigations for potential future attacks (%s nodes)', len(mitigatable_nodes[2]))
         await _apply_immediate_mitigation(mitigatable_nodes[2], parsed_alert)
 
         # Step 4: Resolve past mitigations
-        log.info('Applying immediate mitigations for previous attacks')
+        log.info('Applying immediate mitigations for previous attacks (%s nodes)', len(mitigatable_nodes[0]))
         await _apply_immediate_mitigation(mitigatable_nodes[0], parsed_alert)
 
     except asyncio.CancelledError:
@@ -38,14 +38,14 @@ async def handle_alert(alert: dict):
 
 async def _apply_immediate_mitigation(nodes: list[AttackNode], alert: Alert):
     for node in nodes:
-        log.info('Resolving optimal workflow for attack node')
+        log.debug('Resolving optimal workflow for attack node')
         wf = await workflows.locate(node)
         if wf is None:
             log.warning('No satisfactory workflow located, ignoring attack node')
         elif not alert.satisfies(wf):
             log.warning('Workflow cannot be applied with the current alert, ignoring attack node')
         else:
-            log.debug('Workflow located, applying')
+            log.debug('Applying workflow "%s"', wf.name)
             await wf.execute(alert)
             if wf.executed:
                 log.info('Workflows applied successfully')

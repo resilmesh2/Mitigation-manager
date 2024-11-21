@@ -95,8 +95,6 @@ class DatabaseHandler:
         self.connection = connection
 
     async def _extract_condition_parameters(self, row: Row) -> tuple[int, dict, dict, LiteralString, list[Callable]]:
-        config.log.debug(row)
-        config.log.debug(row.keys)
         return (row['identifier'],
                 loads(row['params']),
                 loads(row['args']),
@@ -123,7 +121,6 @@ class DatabaseHandler:
     async def store_condition(self, condition: Condition) -> None:
         """Store a condition."""
         query = 'INSERT INTO Conditions VALUES (?, ?, ?, ?, ?)'
-        config.log.info(type(condition.checks))
         checks = self._mkstr([i
                               for i in DatabaseHandler.CHECK_CODES
                               if DatabaseHandler.CHECK_CODES[i] in condition.checks])
@@ -154,7 +151,6 @@ class DatabaseHandler:
         WHERE identifier = ?
         """
         parameters = (identifier,)
-        log.debug('Retrieving node ID %s', identifier)
         async with self.connection.execute(query, parameters) as cursor:
             row = await cursor.fetchone()
             if row is None:
@@ -211,7 +207,6 @@ class DatabaseHandler:
         WHERE identifier = ?
         """
         parameters = (identifier,)
-        log.debug('Retrieving workflow ID %s', identifier)
         async with self.connection.execute(query, parameters) as cursor:
             row = await cursor.fetchone()
             if row is None:
@@ -236,7 +231,6 @@ class DatabaseHandler:
                       workflow.cost,
                       dumps(workflow.params),
                       dumps(workflow.args))
-        log.debug('Storing workflow ID %s', workflow.identifier)
         await self.connection.execute(query, parameters)
         await self.connection.commit()
 
@@ -436,13 +430,14 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
 
     completed: list[AttackNode] = []
     # 1: Advance local state if necessary.
-    log.debug('Advancing local state for %s nodes', len(state))
+    log.info('Advancing attack front')
+    log.debug('Current attack front:  %s', [n.identifier for n in state])
     for node in state:
         _next = node.nxt
         if _next is None:
             # Attack finished, but we might want to mitigate the
             # attack tree.  Keep it for now.
-            log.debug('Attack graph with starting node ID %s was completed by this alert',
+            log.debug('Attack graph with starting node %s was completed by this alert',
                       node.first().identifier)
             completed.append(node.first())
             continue
@@ -453,6 +448,8 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
             tasks.append(get_handler().mark_complete(node))
             new_state.append(_next)
             old_state.append(node)
+            continue
+        log.debug('Node %s did not change state', node.identifier)
 
     # 2: Add new attack graphs to the local state
     new_attack_graphs = await get_handler().retrieve_potential_graphs(alert.rule_mitre_ids)
@@ -462,34 +459,38 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
                   for n in new_attack_graphs])
 
     # 3: Update probability percentages
-    log.debug('Updating probabilities for all nodes')
+    log.debug('Updating probabilities')
     tasks.extend([get_handler().update_probability(n)
                   for n, p in [(n, await n.update_probability(alert))
                                for node in state for n in node.all()]
                   if p])
 
     # Run all DB updates
-    log.debug('Running %s DB tasks...', len(tasks))
+    log.debug('Running %s DB tasks', len(tasks))
     await gather(*tasks)
-    log.debug('DB tasks executed')
 
     # Update local state
-    (state.remove(n) for n in old_state)
+    for n in old_state:
+        state.remove(n)
     state.extend(new_state)
 
-    log.debug('Updated local state now contains %s attack node/s', len(state))
+    log.debug('The updated attack front is: %s', [n.identifier for n in state])
+    log.info('Evaluating attack front')
 
     for node in state:
         # Past: judge based on risk history
         for n in node.all_before():
             if n.historically_risky():
+                log.debug('Node %s has been historically very risky, appending', n.identifier)
                 past.append(n)
         # Present: only if it was related to this alert
         if node.technique in alert.rule_mitre_ids:
+            log.debug('Node %s is directly impacted by the alert, appending', node.identifier)
             present.append(node)
         # Future: judge based on how likely it is
         for n in node.all_after():
             if n.probability > config.PROBABILITY_TRESHOLD:
+                log.debug('Node %s is very likely to occur in the future, appending', n.identifier)
                 future.append(n)
 
     return (past, present, future)

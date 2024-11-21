@@ -320,6 +320,7 @@ class Workflow(_UsesAlertParameters):
 
     async def execute(self, alert: Alert) -> bool:
         """Execute the workflow."""
+        config.log.debug('Executing workflow "%s"', self.name)
         body = self.parameters(alert)
         async with ClientSession() as client, client.post(self.url, json=body) as response:
             if response.status == 200:
