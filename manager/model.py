@@ -63,6 +63,10 @@ class Alert(SimpleNamespace):
                     raise ValueError(msg)
                 setattr(self, d[f], a[f])
 
+    def satisfies(self, workflow: Workflow) -> bool:
+        """Check if the alert satisfies the workflow parameters."""
+        return workflow.parameters(self) is not None
+
 
 class _UsesAlertParameters:
     def __init__(self,
