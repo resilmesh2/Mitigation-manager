@@ -470,11 +470,15 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
 
     for node in state:
         # Past: judge based on risk history
-        (past.append(n) for n in node.all_before() if n.historically_risky())
+        for n in node.all_before():
+            if n.historically_risky():
+                past.append(n)
         # Present: only if it was related to this alert
         if node.technique in alert.rule_mitre_ids:
             present.append(node)
         # Future: judge based on how likely it is
-        (future.append(n) for n in node.all_after() if n.probability > config.PROBABILITY_TRESHOLD)
+        for n in node.all_after():
+            if n.probability > config.PROBABILITY_TRESHOLD:
+                future.append(n)
 
     return (past, present, future)
