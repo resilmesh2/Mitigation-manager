@@ -26,6 +26,10 @@ PROBABILITY_EPSILON = 0.0001
 PROBABILITY_TRESHOLD = 0.75
 
 
+class InvalidEnvironmentError(Exception):
+    """Raised when a critical environment constraint is broken."""
+
+
 def set_config(app: Sanic):
     global ENV
     ENV = app.config
@@ -42,9 +46,9 @@ def getenv(key: str, optional: bool = False) -> str:
     global ENV
     if ENV is None:
         msg = 'Environment was not initialized'
-        raise ValueError(msg)
+        raise InvalidEnvironmentError(msg)
     var = ENV[key]
     if (var is None or var == '') and not optional:
         msg = f'Missing environment variable "{key}"'
-        raise ValueError(msg)
+        raise InvalidEnvironmentError(msg)
     return var

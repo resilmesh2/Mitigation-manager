@@ -36,6 +36,10 @@ def get_handler() -> DatabaseHandler:
     return HANDLER
 
 
+class InvalidDatabaseStateError(Exception):
+    """Raised when a core database constraint is broken."""
+
+
 class DatabaseHandler:
     CHECK_CODES = MappingProxyType({
         1: Condition.check_all_params_in_all_rows,

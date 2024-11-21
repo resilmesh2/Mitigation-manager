@@ -20,6 +20,10 @@ MitreTechnique = str
 JsonPrimitive = str | int | float | bool | list
 
 
+class InvalidAlertError(Exception):
+    """Raises when an alert doesn't conform to the expected format."""
+
+
 class Alert(SimpleNamespace):
 
     TRANSLATIONS = {  # noqa: RUF012
@@ -55,12 +59,12 @@ class Alert(SimpleNamespace):
             if type(d[f]) is dict:
                 if type(a[f]) is not dict:
                     msg = f"Expected 'dict' in alert field '{f}', got '{type(a[f])}'"
-                    raise ValueError(msg)
+                    raise InvalidAlertError(msg)
                 self._set(a[f], d[f])
             elif type(d[f]) is str:
                 if all(not isinstance(a[f], t) for t in get_args(JsonPrimitive)):
                     msg = f"Expected JSON primitive in alert field '{f}', got '{type(a[f])}'"
-                    raise ValueError(msg)
+                    raise InvalidAlertError(msg)
                 setattr(self, d[f], a[f])
 
     def satisfies(self, workflow: Workflow) -> bool:
