@@ -49,8 +49,13 @@ class Alert(SimpleNamespace):
         },
     }
 
+    REQUIRED_TYPES = {  # noqa: RUF012
+        'rule_mitre_ids': list,
+    }
+
     def __init__(self, alert: dict) -> None:
         self._set(alert, self.TRANSLATIONS)
+        self._validate()
 
     def _set(self, a: dict, d: dict):
         for f in d:
@@ -66,6 +71,15 @@ class Alert(SimpleNamespace):
                     msg = f"Expected JSON primitive in alert field '{f}', got '{type(a[f])}'"
                     raise InvalidAlertError(msg)
                 setattr(self, d[f], a[f])
+
+    def _validate(self):
+        for attr, clazz in self.REQUIRED_TYPES.items():
+            if not hasattr(self, attr):
+                continue
+            t = type(getattr(self, attr))
+            if t is not clazz:
+                msg = f'Alert attribute {attr} is not the correct type (expected {clazz}, got {t})'
+                raise InvalidAlertError(msg)
 
     def satisfies(self, workflow: Workflow) -> bool:
         """Check if the alert satisfies the workflow parameters."""
