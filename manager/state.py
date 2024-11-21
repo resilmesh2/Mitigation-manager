@@ -268,8 +268,13 @@ class DatabaseHandler:
         return ret
 
     async def _retrieve_full_graph(self, initial_node: AttackNode) -> AttackNode:
-        """Return an initial node's complete attack graph."""
+        """Return an initial node's complete attack graph.
+
+        The node returned is the ongoing node.  If none of the
+        subsequent nodes are the ongoing node, returns `initial_node`.
+        """
         final_node = initial_node
+        attack_front = initial_node
         query_for_first_nxt = """
         SELECT nxt
         FROM AttackNodes
@@ -295,9 +300,15 @@ class DatabaseHandler:
                     return final_node.first()
                 row_params = await self._extract_node_parameters(row)
                 final_node = final_node.then(*row_params)
+                ongoing = row['ongoing'] == 1
+                if ongoing:
+                    if attack_front is not initial_node:  # Means attack_front was already set
+                        msg = 'Multiple ongoing nodes'
+                        raise ValueError(msg)
+                    attack_front = final_node
                 nxt = row['nxt']
                 if nxt is None:
-                    return final_node.first()
+                    return attack_front
 
     async def retrieve_potential_graphs(self, attacks: list[MitreTechnique]) -> list[AttackNode]:
         """Return a list of potential new attack graphs."""
