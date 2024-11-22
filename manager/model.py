@@ -199,6 +199,7 @@ class AttackNode:
 
     @property
     def probability(self) -> float:
+        """The node's probability of being triggered in the future."""
         return self.probability_history[-1] if len(self.probability_history) > 0 else 0.0
 
     def first(self) -> AttackNode:
