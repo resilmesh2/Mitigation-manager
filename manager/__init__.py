@@ -4,7 +4,7 @@ from sanic import Blueprint, HTTPResponse, Request, json, empty
 
 from manager.config import log, version
 from manager.model import AttackNode, Condition, DummyCondition, Workflow
-from manager.state import StateManager, get_handler
+from manager.state import StateManager, get_state_manager
 from manager.tasks import handle_alert
 
 bp_manager = Blueprint('manager')
@@ -197,7 +197,7 @@ async def get_condition(request: Request) -> HTTPResponse:
       '404':
         description: No condition with such ID was found.
     """  # noqa: W505 RUF100
-    condition = await get_handler().retrieve_condition(int(request.args.get('id')))
+    condition = await get_state_manager().retrieve_condition(int(request.args.get('id')))
     return json(StateManager.to_dict(condition)) if condition is not None else empty(404)
 
 
@@ -268,12 +268,13 @@ async def post_condition(request: Request) -> HTTPResponse:
     if condition is None:
         return empty(400)
     log.info('Parsing condition')
-    await get_handler().store_condition(Condition(condition['identifier'],
-                                                  condition['params'],
-                                                  condition['args'],
-                                                  condition['query'],
-                                                  [get_handler().CHECK_CODES[i]
-                                                   for i in condition['checks']]))
+    await get_state_manager().store_condition(Condition(condition['identifier'],
+                                                        condition['params'],
+                                                        condition['args'],
+                                                        condition['query'],
+                                                        [get_handler().CHECK_CODES[i]
+                                                         for i in condition['checks']]))
+
     return empty(200)
 
 
@@ -340,7 +341,7 @@ async def get_node(request: Request) -> HTTPResponse:
       '404':
         description: No node with such ID was found.
     """  # noqa: W505 RUF100
-    node = await get_handler().retrieve_node(int(request.args.get('id')))
+    node = await get_state_manager().retrieve_node(int(request.args.get('id')))
     return json(StateManager.to_dict(node)) if node is not None else empty(404)
 
 
@@ -397,10 +398,10 @@ async def post_node(request: Request) -> HTTPResponse:
     """  # noqa: W505 RUF100
     node = request.json
     log.info('Parsing node')
-    await get_handler().store_node(AttackNode(node['identifier'],
-                                              node['technique'],
-                                              [DummyCondition(c_id) for c_id in node['conditions']],
-                                              node['probabilities']))
+    await get_state_manager().store_node(AttackNode(node['identifier'],
+                                                    node['technique'],
+                                                    [DummyCondition(c_id) for c_id in node['conditions']],
+                                                    node['probabilities']))
     return empty(200)
 
 
@@ -490,7 +491,7 @@ async def get_workflow(request: Request) -> HTTPResponse:
       '404':
         description: No workflow with such ID was found.
     """  # noqa: W505 RUF100
-    workflow = await get_handler().retrieve_workflow(int(request.args.get('id')))
+    workflow = await get_state_manager().retrieve_workflow(int(request.args.get('id')))
     return json(StateManager.to_dict(workflow)) if workflow is not None else empty(404)
 
 
@@ -570,12 +571,12 @@ async def post_workflow(request: Request) -> HTTPResponse:
     """  # noqa: W505 RUF100
     workflow = request.json
     log.info('Parsing workflow')
-    await get_handler().store_workflow(Workflow(workflow['identifier'],
-                                                workflow['name'],
-                                                workflow['description'],
-                                                workflow['url'],
-                                                workflow['effective_attacks'],
-                                                workflow['cost'],
-                                                workflow['params'],
-                                                workflow['args']))
+    await get_state_manager().store_workflow(Workflow(workflow['identifier'],
+                                                      workflow['name'],
+                                                      workflow['description'],
+                                                      workflow['url'],
+                                                      workflow['effective_attacks'],
+                                                      workflow['cost'],
+                                                      workflow['params'],
+                                                      workflow['args']))
     return empty(200)

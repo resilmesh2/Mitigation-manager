@@ -39,7 +39,7 @@ def initialize_neo4j(app: Sanic):  # noqa: D103
                                          auth=(getenv('NEO4J_USERNAME'),
                                                getenv('NEO4J_PASSWORD')))
     app.ctx.neo4j_driver = driver
-    isim.set_driver(driver)
+    isim.set_isim_manager(driver)
 
 
 async def shutdown_neo4j(app: Sanic):  # noqa: D103
@@ -55,7 +55,7 @@ async def initialize_sqlite(app: Sanic):  # noqa: D103
     await c.executescript(script)
     await app.ctx.sqlite_db.commit()
     await c.close()
-    state.set_handler(state.StateManager(app.ctx.sqlite_db))
+    state.set_state_manager(state.StateManager(app.ctx.sqlite_db))
 
 
 async def shutdown_sqlite(app: Sanic):  # noqa: D103

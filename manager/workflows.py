@@ -1,11 +1,11 @@
 from manager.config import log
 from manager.model import AttackNode, Workflow
-from manager.state import get_handler
+from manager.state import get_state_manager
 
 
 async def locate(node: AttackNode) -> Workflow | None:
     """Retrieve the optimal workflow to mitigate an attack."""
-    valid_workflows = await get_handler().retrieve_applicable_workflows(node.technique)
+    valid_workflows = await get_state_manager().retrieve_applicable_workflows(node.technique)
 
     log.debug('Applicable workflows for attack %s: %s', node.technique, [w.name for w in valid_workflows])
 

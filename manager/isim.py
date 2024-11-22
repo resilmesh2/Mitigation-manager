@@ -1,32 +1,35 @@
-from collections.abc import Callable
-from typing import LiteralString
+from __future__ import annotations
 
-from neo4j import AsyncDriver, Query, Record
+from typing import TYPE_CHECKING, LiteralString
 
 from manager.config import InvalidEnvironmentError
 
-DRIVER: AsyncDriver | None = None
+if TYPE_CHECKING:
+    from neo4j import AsyncDriver, Record
+
+ISIM_MANAGER: IsimManager | None = None
 
 
-def set_driver(driver: AsyncDriver):
-    """Set the global ISIM driver."""
-    global DRIVER
-    DRIVER = driver
+def set_isim_manager(isim_manager: AsyncDriver):
+    """Set the global ISIM manager."""
+    global ISIM_MANAGER
+    ISIM_MANAGER = IsimManager(isim_manager)
 
 
-def get_driver() -> AsyncDriver:
-    """Get the global ISIM driver."""
-    global DRIVER
-    if DRIVER is None:
+def get_isim_manager() -> IsimManager:
+    """Get the global ISIM manager."""
+    global ISIM_MANAGER
+    if ISIM_MANAGER is None:
         msg = 'Neo4j driver was never set'
         raise InvalidEnvironmentError(msg)
-    return DRIVER
+    return ISIM_MANAGER
 
 
-async def check_conditions(query: LiteralString,
-                           parameters: dict,
-                           conditions: list[Callable[[list[Record], dict], bool]],
-                           ) -> bool:
-    """Query the ISIM and evaluate a condition."""
-    res = await get_driver().execute_query(Query(query), parameters)
-    return all(c(res.records, parameters) for c in conditions)
+class IsimManager:
+    def __init__(self, driver: AsyncDriver) -> None:
+        self.driver = driver
+
+    async def run_query(self, query: LiteralString, parameters: dict) -> list[Record]:
+        """Run a query against the ISIM."""
+        res = await self.driver.execute_query(query, parameters)
+        return res.records

@@ -16,22 +16,22 @@ if TYPE_CHECKING:
     from manager.model import Alert
 
 
-HANDLER: StateManager | None = None
+STATE_MANAGER: StateManager | None = None
 
 
-def set_handler(handler: StateManager):
-    """Set the global database handler."""
-    global HANDLER
-    HANDLER = handler
+def set_state_manager(state_manager: StateManager):
+    """Set the global state manager."""
+    global STATE_MANAGER
+    STATE_MANAGER = state_manager
 
 
-def get_handler() -> StateManager:
-    """Get the global database handler."""
-    global HANDLER
-    if HANDLER is None:
-        msg = 'Database handler was never set'
+def get_state_manager() -> StateManager:
+    """Get the global state manager."""
+    global STATE_MANAGER
+    if STATE_MANAGER is None:
+        msg = 'State manager was never set'
         raise InvalidEnvironmentError(msg)
-    return HANDLER
+    return STATE_MANAGER
 
 
 class InvalidDatabaseStateError(Exception):
@@ -412,7 +412,7 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
     - Nodes immediately related by the alert.
     - Nodes further along in the active attack graphs.
     """
-    state = await get_handler().retrieve_state()
+    state = await get_state_manager().retrieve_state()
 
     new_state: list[AttackNode] = []
     old_state: list[AttackNode] = []
@@ -426,7 +426,7 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
     log.debug('Attack front before retrieving new attack graphs: %s', [n.identifier for n in state])
 
     # 1: Add new attack graphs to the local state
-    new_attack_graphs = await get_handler().retrieve_new_graphs(alert)
+    new_attack_graphs = await get_state_manager().retrieve_new_graphs(alert)
     log.debug('Retrieved %s new attack graphs', len(new_attack_graphs))
     state.extend(new_attack_graphs)
 
@@ -435,7 +435,7 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
     log.debug('Current attack front:  %s', [n.identifier for n in state])
     for node in state:
         if alert.triggers(node):
-            await get_handler().mark_complete(node)
+            await get_state_manager().mark_complete(node)
             if node.nxt is not None:
                 log.debug('Advancing state from node %s to %s', node.identifier, node.nxt.identifier)
                 new_state.append(node.nxt)
@@ -453,11 +453,11 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
     log.debug('Updating probabilities')
     for n, p in [(n, await n.update_probability(alert)) for node in state for n in node.all()]:
         if p:
-            await get_handler().update_probability(n)
+            await get_state_manager().update_probability(n)
 
     # Run all DB updates
     log.debug('Committing changes to DB')
-    await get_handler().connection.commit()
+    await get_state_manager().connection.commit()
 
     # Update local state
     for n in old_state:
