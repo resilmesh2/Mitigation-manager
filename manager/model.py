@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import reduce
 from math import fabs
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, LiteralString, get_args
+from typing import LiteralString, get_args
 
 import hy
 from aiohttp import ClientSession
@@ -11,9 +11,6 @@ from aiohttp import ClientSession
 from manager import config
 from manager.isim import get_isim_manager
 from manager.state import get_state_manager
-
-if TYPE_CHECKING:
-    from neo4j import Record
 
 WorkflowUrl = str
 MitreTechnique = str
