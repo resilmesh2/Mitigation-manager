@@ -55,7 +55,7 @@ async def initialize_sqlite(app: Sanic):  # noqa: D103
     await c.executescript(script)
     await app.ctx.sqlite_db.commit()
     await c.close()
-    state.set_handler(state.DatabaseHandler(app.ctx.sqlite_db))
+    state.set_handler(state.StateManager(app.ctx.sqlite_db))
 
 
 async def shutdown_sqlite(app: Sanic):  # noqa: D103

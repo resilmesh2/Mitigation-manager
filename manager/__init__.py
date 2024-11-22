@@ -4,7 +4,7 @@ from sanic import Blueprint, HTTPResponse, Request, json, empty
 
 from manager.config import log, version
 from manager.model import AttackNode, Condition, DummyCondition, Workflow
-from manager.state import DatabaseHandler, get_handler
+from manager.state import StateManager, get_handler
 from manager.tasks import handle_alert
 
 bp_manager = Blueprint('manager')
@@ -198,7 +198,7 @@ async def get_condition(request: Request) -> HTTPResponse:
         description: No condition with such ID was found.
     """  # noqa: W505 RUF100
     condition = await get_handler().retrieve_condition(int(request.args.get('id')))
-    return json(DatabaseHandler.to_dict(condition)) if condition is not None else empty(404)
+    return json(StateManager.to_dict(condition)) if condition is not None else empty(404)
 
 
 @bp_manager.post('/condition')
@@ -341,7 +341,7 @@ async def get_node(request: Request) -> HTTPResponse:
         description: No node with such ID was found.
     """  # noqa: W505 RUF100
     node = await get_handler().retrieve_node(int(request.args.get('id')))
-    return json(DatabaseHandler.to_dict(node)) if node is not None else empty(404)
+    return json(StateManager.to_dict(node)) if node is not None else empty(404)
 
 
 @bp_manager.post('/node')
@@ -491,7 +491,7 @@ async def get_workflow(request: Request) -> HTTPResponse:
         description: No workflow with such ID was found.
     """  # noqa: W505 RUF100
     workflow = await get_handler().retrieve_workflow(int(request.args.get('id')))
-    return json(DatabaseHandler.to_dict(workflow)) if workflow is not None else empty(404)
+    return json(StateManager.to_dict(workflow)) if workflow is not None else empty(404)
 
 
 @bp_manager.post('/workflow')

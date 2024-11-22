@@ -16,17 +16,17 @@ if TYPE_CHECKING:
     from manager.model import Alert
 
 
-HANDLER: DatabaseHandler | None = None
+HANDLER: StateManager | None = None
 
 
-def set_handler(handler: DatabaseHandler):
-    """Set the global ISIM driver."""
+def set_handler(handler: StateManager):
+    """Set the global database handler."""
     global HANDLER
     HANDLER = handler
 
 
-def get_handler() -> DatabaseHandler:
-    """Get the global ISIM driver."""
+def get_handler() -> StateManager:
+    """Get the global database handler."""
     global HANDLER
     if HANDLER is None:
         msg = 'Database handler was never set'
@@ -38,7 +38,7 @@ class InvalidDatabaseStateError(Exception):
     """Raised when a core database constraint is broken."""
 
 
-class DatabaseHandler:
+class StateManager:
     CHECK_CODES = MappingProxyType({
         1: Condition.check_all_params_in_all_rows,
         2: Condition.check_all_params_in_any_row,
@@ -65,7 +65,7 @@ class DatabaseHandler:
                 'params': item.params,
                 'args': item.args,
                 'query': item.query,
-                'checks': DatabaseHandler._mkchecklist(item.checks),
+                'checks': StateManager._mkchecklist(item.checks),
             }
         if type(item) is AttackNode:
             return {
@@ -92,7 +92,7 @@ class DatabaseHandler:
 
     @staticmethod
     def _mkchecklist(_list: list[Callable]) -> list[int]:
-        return [s for s in DatabaseHandler.CHECK_CODES if DatabaseHandler.CHECK_CODES[s] in _list]
+        return [s for s in StateManager.CHECK_CODES if StateManager.CHECK_CODES[s] in _list]
 
     def __init__(self, connection: Connection) -> None:
         self.connection = connection
@@ -102,7 +102,7 @@ class DatabaseHandler:
                 loads(row['params']),
                 loads(row['args']),
                 row['query'],
-                self._mklist(row['checks'], lambda s: DatabaseHandler.CHECK_CODES[int(s)]))
+                self._mklist(row['checks'], lambda s: StateManager.CHECK_CODES[int(s)]))
 
     async def retrieve_condition(self, identifier: int) -> Condition | None:
         """Return the condition specified by the identifier.
@@ -125,8 +125,8 @@ class DatabaseHandler:
         """Store a condition."""
         query = 'INSERT INTO Conditions VALUES (?, ?, ?, ?, ?)'
         checks = self._mkstr([i
-                              for i in DatabaseHandler.CHECK_CODES
-                              if DatabaseHandler.CHECK_CODES[i] in condition.checks])
+                              for i in StateManager.CHECK_CODES
+                              if StateManager.CHECK_CODES[i] in condition.checks])
         await self.connection.execute(query, (condition.identifier,
                                               dumps(condition.params),
                                               dumps(condition.args),
