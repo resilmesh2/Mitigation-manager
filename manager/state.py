@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from json import dumps, loads
-from types import MappingProxyType
 from typing import TYPE_CHECKING, LiteralString, TypeVar
 
 from manager import config
@@ -39,12 +38,6 @@ class InvalidDatabaseStateError(Exception):
 
 
 class StateManager:
-    CHECK_CODES = MappingProxyType({
-        1: Condition.check_all_params_in_all_rows,
-        2: Condition.check_all_params_in_any_row,
-        3: Condition.check_any_param_in_all_rows,
-        4: Condition.check_any_param_in_any_row,
-    })
 
     T = TypeVar('T')
 
@@ -62,9 +55,10 @@ class StateManager:
         if type(item) is Condition:
             return {
                 'identifier': item.identifier,
+                'name': item.name,
+                'description': item.description,
                 'params': item.params,
                 'args': item.args,
-                'query': item.query,
                 'check': item.check,
             }
         if type(item) is AttackNode:
@@ -73,7 +67,7 @@ class StateManager:
                 'prv': item.prv.identifier if item.prv is not None else None,
                 'nxt': item.nxt.identifier if item.nxt is not None else None,
                 'technique': item.technique,
-                'conditions': [c.identifier for c in item.conditions],
+                'conditions': [StateManager.to_dict(c) for c in item.conditions],
                 'probabilities': item.probability_history,
                 'description': None,
             }
@@ -85,23 +79,19 @@ class StateManager:
                 'url': item.url,
                 'effective_attacks': item.effective_attacks,
                 'cost': item.cost,
-                'params': item.params,
-                'args': item.args,
+                'checks': [StateManager.to_dict(c) for c in item.conditions],
             }
         return None
-
-    @staticmethod
-    def _mkchecklist(_list: list[Callable]) -> list[int]:
-        return [s for s in StateManager.CHECK_CODES if StateManager.CHECK_CODES[s] in _list]
 
     def __init__(self, connection: Connection) -> None:
         self.connection = connection
 
-    async def _extract_condition_parameters(self, row: Row) -> tuple[int, dict, dict, LiteralString, str]:
+    async def _extract_condition_parameters(self, row: Row) -> tuple[int, str, str, dict, dict, str]:
         return (row['identifier'],
+                row['condition_name'],
+                row['condition_description'],
                 loads(row['params']),
                 loads(row['args']),
-                row['query'],
                 row['check'])
 
     async def retrieve_condition(self, identifier: int) -> Condition | None:
@@ -123,11 +113,12 @@ class StateManager:
 
     async def store_condition(self, condition: Condition) -> None:
         """Store a condition."""
-        query = 'INSERT INTO Conditions VALUES (?, ?, ?, ?, ?)'
+        query = 'INSERT INTO Conditions VALUES (?, ?, ?, ?, ?, ?)'
         await self.connection.execute(query, (condition.identifier,
+                                              condition.name,
+                                              condition.description,
                                               dumps(condition.params),
                                               dumps(condition.args),
-                                              condition.query,
                                               condition.check))
 
     async def _row_to_node_parameters(self, row: Row) -> tuple[int, str, list[Condition], list[float]]:
@@ -183,7 +174,8 @@ class StateManager:
                                                                     list[MitreTechnique],
                                                                     int,
                                                                     dict,
-                                                                    dict]:
+                                                                    dict,
+                                                                    list[Condition]]:
         identifier = int(row['identifier'])
         name = row['workflow_name']
         desc = row['workflow_desc']
@@ -192,7 +184,10 @@ class StateManager:
         cost = int(row['cost'])
         params = loads(row['params'])
         args = loads(row['args'])
-        return (identifier, name, desc, url, effective_attacks, cost, params, args)
+        conditions = [await self.retrieve_condition(i) for i in self._mklist(row['conditions'], int)]
+        return (identifier, name, desc, url, effective_attacks, cost, params, args, [c
+                                                                                     for c in conditions
+                                                                                     if c is not None])
 
     async def retrieve_workflow(self, identifier: int) -> Workflow | None:
         """Return the workflow specified by the identifier.
@@ -227,8 +222,8 @@ class StateManager:
                       workflow.url,
                       self._mkstr(workflow.effective_attacks),
                       workflow.cost,
-                      dumps(workflow.params),
-                      dumps(workflow.args))
+                      dumps(workflow.workflow_parameters),
+                      dumps(workflow.workflow_arguments))
         await self.connection.execute(query, parameters)
 
     async def retrieve_state(self) -> list[AttackNode]:

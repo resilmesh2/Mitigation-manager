@@ -1,9 +1,10 @@
 CREATE TABLE IF NOT EXISTS Conditions (
     identifier INT PRIMARY KEY,
+    condition_name TEXT,
+    condition_description TEXT,
     params TEXT NOT NULL DEFAULT '{}',
     args TEXT NOT NULL DEFAULT '{}',
-    query TEXT NOT NULL,
-    check TEXT
+    check TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS AttackNodes (
@@ -31,7 +32,8 @@ CREATE TABLE IF NOT EXISTS Workflows (
     effective_attacks TEXT,
     cost INT,
     params TEXT NOT NULL DEFAULT '{}',
-    args TEXT NOT NULL DEFAULT '{}'
+    args TEXT NOT NULL DEFAULT '{}',
+    conditions TEXT DEFAULT NULL
 );
 
 

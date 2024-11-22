@@ -41,9 +41,9 @@ async def _apply_immediate_mitigation(nodes: list[AttackNode], alert: Alert):
         log.debug('Resolving optimal workflow for attack node')
         wf = await workflows.locate(node)
         if wf is None:
-            log.warning('No satisfactory workflow located, ignoring attack node')
-        elif not alert.satisfies(wf):
-            log.warning('Workflow cannot be applied with the current alert, ignoring attack node')
+            log.warning('No satisfactory workflow located, unable to mitigate node')
+        elif not await wf.is_executable(alert):
+            log.warning('Workflow conditions are not met, unable to execute')
         else:
             log.debug('Applying workflow "%s"', wf.name)
             await wf.execute(alert)

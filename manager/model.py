@@ -85,10 +85,6 @@ class Alert(SimpleNamespace):
         """Check if the alert has any associated MITRE ATT&CK IDs."""
         return hasattr(self, 'rule_mitre_ids') and len(self.rule_mitre_ids) > 0
 
-    def satisfies(self, workflow: Workflow) -> bool:
-        """Check if the alert satisfies the workflow parameters."""
-        return workflow.parameters(self) is not None
-
     def triggers(self, node: AttackNode) -> bool:
         """Check if the alert triggers the attack node."""
         if not self.has_mitre_attacks():
@@ -96,15 +92,21 @@ class Alert(SimpleNamespace):
         return node.technique in self.rule_mitre_ids
 
 
-class _UsesAlertParameters:
+class Condition:
     def __init__(self,
+                 identifier: int,
+                 name: str,
+                 description: str,
                  params: dict[str, JsonPrimitive],
                  args: dict[str, str | list[str]],
-                 check_str: str,
+                 check: str,
                  ) -> None:
+        self.identifier = identifier
+        self.name = name
+        self.description = description
         self.params = params
         self.args = args
-        self.check_str = check_str
+        self.check = check
 
     def parameters(self, alert: Alert) -> dict[str, JsonPrimitive] | None:
         """Return a dict containing parameters and their values."""
@@ -130,16 +132,11 @@ class _UsesAlertParameters:
                     return None
         return self.params | ret
 
-    async def check(self, alert: Alert) -> bool:
-        """Check the current object.
+    async def is_met(self, alert: Alert) -> bool:
+        """Check if the condition is met.
 
         Warning: this method executes arbitrary Hy code.  Never call
         this method with an untrusted string.
-
-        This method generally translates to "check if applicable", but
-        it means different things for different implementations.  For
-        workflows, it means "check if the workflow can be applied",
-        and for conditions it means "check if the condition was met".
 
         Hy code running in this method will have access to the
         following:
@@ -159,7 +156,7 @@ class _UsesAlertParameters:
         state_manager = get_state_manager()
         isim_manager = get_isim_manager()
         # There should only be one form to read anyway
-        parsed_check = hy.read_one(self.check_str)
+        parsed_check = hy.read_one(self.check)
         result = hy.eval(parsed_check)
         return bool(result)
 
@@ -169,49 +166,14 @@ class _UsesAlertParameters:
         return str(self.params['#query'])
 
 
-class Condition(_UsesAlertParameters):
-    def __init__(self,
-                 identifier: int,
-                 params: dict[str, JsonPrimitive],
-                 args: dict[str, str | list[str]],
-                 check: str,
-                 ) -> None:
-        super().__init__(params, args, check)
-        self.identifier = identifier
-
-    @staticmethod
-    def check_any_result(records: list[Record], _: dict[str, JsonPrimitive]) -> bool:
-        """Return true only if there's at least one result."""
-        return len(records) > 0
-
-    @staticmethod
-    def _check_row_params(records: list[Record], params: dict[str, JsonPrimitive], _row, _param) -> bool:
-        return _row(_param(params[x] == r.get(x) for x in params) for r in records)
-
-    @staticmethod
-    def check_any_param_in_any_row(records: list[Record], params: dict[str, JsonPrimitive]) -> bool:
-        """Return true only if some row matches some parameter."""
-        return Condition._check_row_params(records, params, any, any)
-
-    @staticmethod
-    def check_all_params_in_any_row(records: list[Record], params: dict[str, JsonPrimitive]) -> bool:
-        """Return true only if some row matches all parameters."""
-        return Condition._check_row_params(records, params, any, all)
-
-    @staticmethod
-    def check_any_param_in_all_rows(records: list[Record], params: dict[str, JsonPrimitive]) -> bool:
-        """Return true only if all rows match some parameter."""
-        return Condition._check_row_params(records, params, all, any)
-
-    @staticmethod
-    def check_all_params_in_all_rows(records: list[Record], params: dict[str, JsonPrimitive]) -> bool:
-        """Return true only if all rows match all parameters."""
-        return Condition._check_row_params(records, params, all, all)
-
-
 class DummyCondition(Condition):
     def __init__(self, identifier: int) -> None:
-        super().__init__(identifier, {}, {}, '(True)')
+        super().__init__(identifier,
+                         'Dummy condition',
+                         'A dummy condition.  Always evaluates to true.',
+                         {},
+                         {},
+                         '(True)')
 
 
 class AttackNode:
@@ -308,7 +270,7 @@ class AttackNode:
         # met.  If there are no conditions, this value is 1.
         factor_3 = (1.0
                     if len(self.conditions) == 0
-                    else ([await c.check(alert) for c in self.conditions].count(True) / len(self.conditions)))
+                    else ([await c.is_met(alert) for c in self.conditions].count(True) / len(self.conditions)))
 
         old = self.probability
         new = (self._factor_1() + self._factor_2() + factor_3) / 3
@@ -352,7 +314,7 @@ class AttackNode:
         return self.all_before() | {self} | self.all_after()
 
 
-class Workflow(_UsesAlertParameters):
+class Workflow:
     def __init__(self,
                  identifier: int,
                  name: LiteralString,
@@ -360,25 +322,66 @@ class Workflow(_UsesAlertParameters):
                  url: WorkflowUrl,
                  effective_attacks: list[MitreTechnique],
                  cost: int,
-                 params: dict[str, JsonPrimitive],
-                 args: dict[str, str | list[str]],
-                 check: str,
+                 workflow_parameters: dict[str, JsonPrimitive],
+                 workflow_arguments: dict[str, str | list[str]],
+                 conditions: list[Condition],
                  ) -> None:
-        super().__init__(params, args, check)
         self.identifier = identifier
         self.name = name
         self.description = description
         self.url = url
         self.effective_attacks = effective_attacks
         self.cost = cost
+        self.workflow_parameters = workflow_parameters
+        self.workflow_arguments = workflow_arguments
+        self.conditions = conditions
 
         self.executed = False
         self.results = None
 
+    def generate_request_json(self, alert: Alert) -> dict | None:
+        """Generate the HTTP request JSON body.
+
+        Returns a JSON-parsable dict with the request body, or `None`
+        if there is no request body.
+        """
+        # This function body is very similar to Condition.parameters()
+        # but it's been duplicated because the logic and semantics are
+        # different.
+        ret = {}
+        for key, value in self.workflow_arguments.items():
+            if key in ret:
+                continue
+            if type(value) is str:
+                if hasattr(alert, value):
+                    ret[key] = getattr(alert, value)
+                else:
+                    # If the alert doesn't have the required field,
+                    # abort
+                    return None
+            if type(value) is list:
+                for v in value:
+                    if hasattr(alert, v):
+                        ret[key] = getattr(alert, v)
+                        break
+                if key not in ret:
+                    # If the alert doesn't have at least one of the
+                    # optional fields, abort
+                    return None
+        return self.workflow_parameters | ret
+
+    async def is_executable(self, alert: Alert) -> bool:
+        """Check whether the workflow can be applied or not.
+
+        Warning: this method executes arbitrary Hy code.  Never call
+        this method with untrusted conditions.
+        """
+        return all([await c.is_met(alert) for c in self.conditions])
+
     async def execute(self, alert: Alert) -> bool:
         """Execute the workflow."""
         config.log.debug('Executing workflow "%s"', self.name)
-        body = self.parameters(alert)
+        body = self.generate_request_json(alert)
         async with ClientSession() as client, client.post(self.url, json=body) as response:
             if response.status == 200:
                 self.results = await response.json()

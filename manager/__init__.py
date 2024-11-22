@@ -160,6 +160,14 @@ async def get_condition(request: Request) -> HTTPResponse:
                     type: integer
                     description: The identifier.
                     example: 123
+                  name:
+                    type: string
+                    description: The condition name.
+                    example: check_equal
+                  description:
+                    type: string
+                    description: A description of the condition.
+                    example: Checks that 3+2 is equal to 3*2
                   params:
                     type: object
                     description: The parameters.
@@ -181,6 +189,8 @@ async def get_condition(request: Request) -> HTTPResponse:
                     example: "(== (+ 3 2) (* 3 2))"
             example:
               identifier: 123
+              name: check_equal
+              description: Checks that 3+2 is equal to 3*2
               params:
                 port: 22
               args:
@@ -217,6 +227,14 @@ async def post_condition(request: Request) -> HTTPResponse:
                   type: integer
                   description: The identifier.
                   example: 123
+                name:
+                  type: string
+                  description: The condition name.
+                  example: check_equal
+                description:
+                  type: string
+                  description: A description of the condition.
+                  example: Checks that 3+2 is equal to 3*2
                 params:
                   type: object
                   description: The parameters.
@@ -238,6 +256,8 @@ async def post_condition(request: Request) -> HTTPResponse:
                   example: "(== (+ 3 2) (* 3 2))"
           example:
             identifier: 123
+            name: check_equal
+            description: Checks that 3+2 is equal to 3*2
             params:
               port: 22
             args:
@@ -252,6 +272,8 @@ async def post_condition(request: Request) -> HTTPResponse:
         return empty(400)
     log.info('Parsing condition')
     await get_state_manager().store_condition(Condition(condition['identifier'],
+                                                        condition['name'],
+                                                        condition['description'],
                                                         condition['params'],
                                                         condition['args'],
                                                         condition['check']))
@@ -417,6 +439,7 @@ async def get_workflow(request: Request) -> HTTPResponse:
                 - cost
                 - params
                 - args
+                - conditions
               properties:
                 identifier:
                   type: integer
@@ -459,6 +482,12 @@ async def get_workflow(request: Request) -> HTTPResponse:
                       type: string
                       description: A key-alert key argument pair.
                       example: alert.device.ip_address
+                conditions:
+                  type: array
+                  description: The list of condition identifiers that must be satisfied before the workflow can run.
+                  items:
+                    type: integer
+                    example: 123
             example:
               identifier: 123
               name: delete_file
@@ -469,6 +498,12 @@ async def get_workflow(request: Request) -> HTTPResponse:
                 - T0002.1
                 - T0002.2
               cost: 10
+              params:
+                port: 22
+              args:
+                ip_address: alert.device.ip_address
+              conditions:
+                - 123
       '404':
         description: No workflow with such ID was found.
     """  # noqa: W505 RUF100
@@ -497,6 +532,7 @@ async def post_workflow(request: Request) -> HTTPResponse:
               - cost
               - params
               - args
+              - conditions
             properties:
               identifier:
                 type: integer
@@ -539,6 +575,12 @@ async def post_workflow(request: Request) -> HTTPResponse:
                     type: string
                     description: A key-alert key argument pair.
                     example: alert.device.ip_address
+              conditions:
+                type: array
+                description: The list of condition identifiers that must be satisfied before the workflow can run.
+                items:
+                  type: integer
+                  example: 123
           example:
             identifier: 123
             name: delete_file
@@ -549,6 +591,10 @@ async def post_workflow(request: Request) -> HTTPResponse:
               - T0002.1
               - T0002.2
             cost: 10
+            params:
+              port: 22
+            args:
+              ip_address: alert.device.ip_address
     """  # noqa: W505 RUF100
     workflow = request.json
     log.info('Parsing workflow')
@@ -559,5 +605,6 @@ async def post_workflow(request: Request) -> HTTPResponse:
                                                       workflow['effective_attacks'],
                                                       workflow['cost'],
                                                       workflow['params'],
-                                                      workflow['args']))
+                                                      workflow['args'],
+                                                      [DummyCondition(i) for i in workflow['conditions']]))
     return empty(200)
