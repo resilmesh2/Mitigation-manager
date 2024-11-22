@@ -3,6 +3,8 @@ from typing import LiteralString
 
 from neo4j import AsyncDriver, Query, Record
 
+from manager.config import InvalidEnvironmentError
+
 DRIVER: AsyncDriver | None = None
 
 
@@ -17,7 +19,7 @@ def get_driver() -> AsyncDriver:
     global DRIVER
     if DRIVER is None:
         msg = 'Neo4j driver was never set'
-        raise Exception(msg)
+        raise InvalidEnvironmentError(msg)
     return DRIVER
 
 

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, LiteralString, TypeVar
 
 from manager import config
 from manager.model import AttackNode, Condition, MitreTechnique, Workflow, WorkflowUrl
-from manager.config import log
+from manager.config import InvalidEnvironmentError, log
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -30,7 +30,7 @@ def get_handler() -> StateManager:
     global HANDLER
     if HANDLER is None:
         msg = 'Database handler was never set'
-        raise Exception(msg)
+        raise InvalidEnvironmentError(msg)
     return HANDLER
 
 
