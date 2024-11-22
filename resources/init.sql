@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS Conditions (
     condition_description TEXT,
     params TEXT NOT NULL DEFAULT '{}',
     args TEXT NOT NULL DEFAULT '{}',
-    check TEXT NOT NULL
+    checkstring TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS AttackNodes (

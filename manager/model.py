@@ -184,6 +184,7 @@ class AttackNode:
                  technique: str,
                  conditions: list[Condition],
                  probability_history: list[float],
+                 description: str,
                  *,
                  prv: AttackNode | None = None,
                  nxt: AttackNode | None = None) -> None:
@@ -193,6 +194,7 @@ class AttackNode:
         self.technique = technique
         self.conditions = conditions
         self.probability_history = probability_history
+        self.description = description
 
         self._cache_flat_map = None
         self._cache_all_before = None
@@ -221,6 +223,7 @@ class AttackNode:
              technique: str,
              conditions: list[Condition],
              probability_history: list[float],
+             description: str,
              *,
              prv: AttackNode | None = None,
              nxt: AttackNode | None = None) -> AttackNode:
@@ -230,7 +233,7 @@ class AttackNode:
         the described node specifies `prv`, `prv` is replaced with the
         current node.
         """
-        tmp = AttackNode(identifier, technique, conditions, probability_history, prv=prv, nxt=nxt)
+        tmp = AttackNode(identifier, technique, conditions, probability_history, description, prv=prv, nxt=nxt)
         if self.nxt is not None:
             self.nxt.prv = None
         tmp.prv = self

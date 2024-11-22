@@ -92,7 +92,7 @@ class StateManager:
                 row['condition_description'],
                 loads(row['params']),
                 loads(row['args']),
-                row['check'])
+                row['checkstring'])
 
     async def retrieve_condition(self, identifier: int) -> Condition | None:
         """Return the condition specified by the identifier.
@@ -113,7 +113,11 @@ class StateManager:
 
     async def store_condition(self, condition: Condition) -> None:
         """Store a condition."""
-        query = 'INSERT INTO Conditions VALUES (?, ?, ?, ?, ?, ?)'
+        query = """
+        INSERT INTO Conditions
+        (identifier, condition_name, condition_description, params, args, checkstring)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """
         await self.connection.execute(query, (condition.identifier,
                                               condition.name,
                                               condition.description,
@@ -121,12 +125,13 @@ class StateManager:
                                               dumps(condition.args),
                                               condition.check))
 
-    async def _row_to_node_parameters(self, row: Row) -> tuple[int, str, list[Condition], list[float]]:
+    async def _row_to_node_parameters(self, row: Row) -> tuple[int, str, list[Condition], list[float], str]:
         identifier = int(row['identifier'])
         technique: str = row['technique']
         conditions = [await self.retrieve_condition(c) for c in self._mklist(row['conditions'], int)]
         probabilities = self._mklist(row['probabilities'], float)
-        return (identifier, technique, [e for e in conditions if e is not None], probabilities)
+        description = row['description']
+        return (identifier, technique, [e for e in conditions if e is not None], probabilities, description)
 
     async def retrieve_node(self, identifier: int) -> AttackNode | None:
         """Return the attack specified by the identifier.
@@ -155,6 +160,7 @@ class StateManager:
         """
         query = """
         INSERT INTO AttackNodes
+        (identifier, prv, nxt, technique, conditions, probabilities, description)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """
         log.debug('Storing node ID %s', node.identifier)
@@ -164,7 +170,7 @@ class StateManager:
                       node.technique,
                       self._mkstr(node.conditions, lambda c: str(c.identifier)),
                       self._mkstr([node.probability, *node.probability_history]),
-                      'description')
+                      node.description)
         await self.connection.execute(query, parameters)
 
     async def _extract_workflow_parameters(self, row: Row) -> tuple[int,
@@ -214,6 +220,7 @@ class StateManager:
         """
         query = """
         INSERT INTO Workflows
+        (identifier, workflow_name, workflow_description, url, effective_attacks, cost, params, args, conditions
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """
         parameters = (workflow.identifier,
@@ -223,7 +230,8 @@ class StateManager:
                       self._mkstr(workflow.effective_attacks),
                       workflow.cost,
                       dumps(workflow.workflow_parameters),
-                      dumps(workflow.workflow_arguments))
+                      dumps(workflow.workflow_arguments),
+                      self._mkstr(workflow.conditions, lambda c: str(c.identifier)))
         await self.connection.execute(query, parameters)
 
     async def retrieve_state(self) -> list[AttackNode]:
