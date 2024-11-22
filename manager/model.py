@@ -5,14 +5,14 @@ from math import fabs
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, LiteralString, get_args
 
+import hy
 from aiohttp import ClientSession
 
 from manager import config
-from manager.isim import check_conditions
+from manager.isim import get_isim_manager
+from manager.state import get_state_manager
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from neo4j import Record
 
 WorkflowUrl = str
@@ -100,9 +100,11 @@ class _UsesAlertParameters:
     def __init__(self,
                  params: dict[str, JsonPrimitive],
                  args: dict[str, str | list[str]],
+                 check_str: str,
                  ) -> None:
         self.params = params
         self.args = args
+        self.check_str = check_str
 
     def parameters(self, alert: Alert) -> dict[str, JsonPrimitive] | None:
         """Return a dict containing parameters and their values."""
@@ -128,19 +130,54 @@ class _UsesAlertParameters:
                     return None
         return self.params | ret
 
+    async def check(self, alert: Alert) -> bool:
+        """Check the current object.
+
+        Warning: this method executes arbitrary Hy code.  Never call
+        this method with an untrusted string.
+
+        This method generally translates to "check if applicable", but
+        it means different things for different implementations.  For
+        workflows, it means "check if the workflow can be applied",
+        and for conditions it means "check if the condition was met".
+
+        Hy code running in this method will have access to the
+        following:
+
+        - `parameters: dict`: The object's parameters, as parsed by
+          the `parameters()` method.
+        - `alert: Alert`: The alert.
+        - `state_manager: StateManager`: The state manager.
+        - `isim_manager: IsimManager`: The ISIM manager.
+
+        Because of the scope, Hy code will obviously have access to
+        more than just this, but to reduce complexity it should only
+        depend on this.
+        """
+        # Set up variables
+        parameters = self.parameters(alert)
+        state_manager = get_state_manager()
+        isim_manager = get_isim_manager()
+        # There should only be one form to read anyway
+        parsed_check = hy.read_one(self.check_str)
+        result = hy.eval(parsed_check)
+        return bool(result)
+
+    def _contains_isim_query(self) -> str | None:
+        if '#query' not in self.params:
+            return None
+        return str(self.params['#query'])
+
 
 class Condition(_UsesAlertParameters):
     def __init__(self,
                  identifier: int,
                  params: dict[str, JsonPrimitive],
                  args: dict[str, str | list[str]],
-                 query: LiteralString,
-                 checks: list[Callable[[list[Record], dict[str, JsonPrimitive]], bool]],
+                 check: str,
                  ) -> None:
-        super().__init__(params, args)
+        super().__init__(params, args, check)
         self.identifier = identifier
-        self.query: LiteralString = query
-        self.checks = checks
 
     @staticmethod
     def check_any_result(records: list[Record], _: dict[str, JsonPrimitive]) -> bool:
@@ -171,19 +208,10 @@ class Condition(_UsesAlertParameters):
         """Return true only if all rows match all parameters."""
         return Condition._check_row_params(records, params, all, all)
 
-    async def check(self, alert: Alert) -> bool:
-        """Query the ISIM and check whether the condition is true."""
-        p = self.parameters(alert)
-        # If not all parameters are available, the condition isn't
-        # fulfilled.
-        if p is None:
-            return False
-        return await check_conditions(self.query, p, self.checks)
-
 
 class DummyCondition(Condition):
     def __init__(self, identifier: int) -> None:
-        super().__init__(identifier, {}, {}, '', [])
+        super().__init__(identifier, {}, {}, '(True)')
 
 
 class AttackNode:
@@ -334,8 +362,9 @@ class Workflow(_UsesAlertParameters):
                  cost: int,
                  params: dict[str, JsonPrimitive],
                  args: dict[str, str | list[str]],
+                 check: str,
                  ) -> None:
-        super().__init__(params, args)
+        super().__init__(params, args, check)
         self.identifier = identifier
         self.name = name
         self.description = description

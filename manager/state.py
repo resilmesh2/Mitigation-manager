@@ -65,7 +65,7 @@ class StateManager:
                 'params': item.params,
                 'args': item.args,
                 'query': item.query,
-                'checks': StateManager._mkchecklist(item.checks),
+                'check': item.check,
             }
         if type(item) is AttackNode:
             return {
@@ -97,12 +97,12 @@ class StateManager:
     def __init__(self, connection: Connection) -> None:
         self.connection = connection
 
-    async def _extract_condition_parameters(self, row: Row) -> tuple[int, dict, dict, LiteralString, list[Callable]]:
+    async def _extract_condition_parameters(self, row: Row) -> tuple[int, dict, dict, LiteralString, str]:
         return (row['identifier'],
                 loads(row['params']),
                 loads(row['args']),
                 row['query'],
-                self._mklist(row['checks'], lambda s: StateManager.CHECK_CODES[int(s)]))
+                row['check'])
 
     async def retrieve_condition(self, identifier: int) -> Condition | None:
         """Return the condition specified by the identifier.
@@ -110,7 +110,7 @@ class StateManager:
         Returns `None` if the condition can't be found.
         """
         query = """
-        SELECT identifier, params, args, query, checks
+        SELECT identifier, params, args, query, check
         FROM Conditions
         WHERE identifier = ?
         """
@@ -124,14 +124,11 @@ class StateManager:
     async def store_condition(self, condition: Condition) -> None:
         """Store a condition."""
         query = 'INSERT INTO Conditions VALUES (?, ?, ?, ?, ?)'
-        checks = self._mkstr([i
-                              for i in StateManager.CHECK_CODES
-                              if StateManager.CHECK_CODES[i] in condition.checks])
         await self.connection.execute(query, (condition.identifier,
                                               dumps(condition.params),
                                               dumps(condition.args),
                                               condition.query,
-                                              checks))
+                                              condition.check))
 
     async def _row_to_node_parameters(self, row: Row) -> tuple[int, str, list[Condition], list[float]]:
         identifier = int(row['identifier'])

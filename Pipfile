@@ -9,6 +9,8 @@ sanic = {extras = ["ext"], version = "*"}
 aiohttp = "*"
 aiosqlite = "*"
 neo4j = "*"
+hy = "*"
+hyrule = "*"
 
 [dev-packages]
 pytest = "*"

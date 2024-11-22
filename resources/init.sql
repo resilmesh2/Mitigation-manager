@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS Conditions (
     params TEXT NOT NULL DEFAULT '{}',
     args TEXT NOT NULL DEFAULT '{}',
     query TEXT NOT NULL,
-    checks TEXT
+    check TEXT
 );
 
 CREATE TABLE IF NOT EXISTS AttackNodes (

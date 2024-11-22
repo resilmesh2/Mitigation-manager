@@ -1,6 +1,7 @@
 from asyncio import Condition
 
 from sanic import Blueprint, HTTPResponse, Request, json, empty
+import hy
 
 from manager.config import log, version
 from manager.model import AttackNode, Condition, DummyCondition, Workflow
@@ -174,26 +175,17 @@ async def get_condition(request: Request) -> HTTPResponse:
                         type: string
                         description: A key-alert key argument pair.
                         example: alert.device.ip_address
-                  query:
+                  check:
                     type: string
-                    description: The query to run against the ISIM.
-                    example: MATCH (i:IP) RETURN i LIMIT 50
-                  checks:
-                    type: array
-                    description: The list of check codes.
-                    items:
-                      type: integer
-                      example: 1
+                    description: A Hy expression to run to check if the condition has been met.
+                    example: "(== (+ 3 2) (* 3 2))"
             example:
               identifier: 123
               params:
                 port: 22
               args:
                 ip_address: alert.device.ip_address
-              query: "MATCH (i:IP) RETURN i LIMIT 50"
-              checks:
-                - 1
-                - 2
+              check: "(== (+ 3 2) (* 3 2))"
       '404':
         description: No condition with such ID was found.
     """  # noqa: W505 RUF100
@@ -240,26 +232,17 @@ async def post_condition(request: Request) -> HTTPResponse:
                       type: string
                       description: A key-alert key argument pair.
                       example: alert.device.ip_address
-                query:
+                check:
                   type: string
-                  description: The query to run against the ISIM.
-                  example: MATCH (i:IP) RETURN i LIMIT 50
-                checks:
-                  type: array
-                  description: The list of check codes.
-                  items:
-                    type: integer
-                    example: 1
+                  description: A Hy expression to run to check if the condition has been met.
+                  example: "(== (+ 3 2) (* 3 2))"
           example:
             identifier: 123
             params:
               port: 22
             args:
               ip_address: alert.device.ip_address
-            query: "MATCH (i:IP) RETURN i LIMIT 50"
-            checks:
-              - 1
-              - 2
+            check: "(== (+ 3 2) (* 3 2))"
     responses:
       '200':
         description: Success
@@ -271,9 +254,7 @@ async def post_condition(request: Request) -> HTTPResponse:
     await get_state_manager().store_condition(Condition(condition['identifier'],
                                                         condition['params'],
                                                         condition['args'],
-                                                        condition['query'],
-                                                        [get_handler().CHECK_CODES[i]
-                                                         for i in condition['checks']]))
+                                                        condition['check']))
 
     return empty(200)
 
