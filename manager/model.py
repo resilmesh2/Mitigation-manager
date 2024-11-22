@@ -357,19 +357,3 @@ class Workflow(_UsesAlertParameters):
             config.log.debug('Workflow request failed with status code %s', response.status)
             config.log.debug(await response.text())
         return self.executed
-
-
-class CVECondition(Condition):
-    def __init__(self, cve_identifier: str) -> None:
-        super().__init__(
-            int.from_bytes(bytes(cve_identifier, 'UTF-8')),
-            params={'cve_id': cve_identifier},
-            args={'ip_address': 'agent_ip'},
-            query='MATCH (ip:IP)<-[:HAS_ASSIGNED]-(:Node)'
-            '-[:IS_A]-(:Host)<-[:ON]-(:SoftwareVersion)<-[:IN]-'
-            '(:Vulnerability)-[:REFERS_TO]->(cve:CVE {CVE_id: $cve_id})\n'
-            'RETURN ip.address as ip_address',
-            checks=[lambda records, parameters:
-                    any(parameters['ip_address'] == r.get('ip_address')
-                        for r in records)],
-        )
