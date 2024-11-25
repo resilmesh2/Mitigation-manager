@@ -4,13 +4,6 @@
 (import manager.state [get_state_manager])
 (import manager.isim [get_isim_manager])
 
-;; TODO
-(defmacro once-only [fields #* body]
-  (setv tmp [])
-  (lfor f fields (tmp.extend [f (gensym)]))
-  `(let ~tmp
-     ~@body))
-
 (defmacro prepare-function [#* body]
   "Create an async function wrapping Hy code.
 
