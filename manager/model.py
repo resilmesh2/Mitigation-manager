@@ -9,8 +9,6 @@ import hy
 from aiohttp import ClientSession
 
 from manager import config
-from manager.isim import get_isim_manager
-from manager.state import get_state_manager
 
 WorkflowUrl = str
 MitreTechnique = str
@@ -129,7 +127,7 @@ class Condition:
                     return None
         return self.params | ret
 
-    async def is_met(self, alert: Alert) -> bool:
+    async def is_met(self, _alert: Alert) -> bool:
         """Check if the condition is met.
 
         Warning: this method executes arbitrary Hy code.  Never call
@@ -143,19 +141,20 @@ class Condition:
         - `alert: Alert`: The alert.
         - `state_manager: StateManager`: The state manager.
         - `isim_manager: IsimManager`: The ISIM manager.
+        - All Hy macros defined in `manager.conditions`
 
         Because of the scope, Hy code will obviously have access to
         more than just this, but to reduce complexity it should only
         depend on this.
         """
-        # Set up variables
-        parameters = self.parameters(alert)
-        state_manager = get_state_manager()
-        isim_manager = get_isim_manager()
-        # There should only be one form to read anyway
-        parsed_check = hy.read_one(self.check)
-        result = hy.eval(parsed_check)
-        return bool(result)
+        # Setup
+        wrapper = """
+        (require manager.conditions *)
+        (with-local-state {})
+        """
+        return await hy.eval(hy.read_many(wrapper.format(self.check)))(self.parameters(_alert),
+                                                                       _alert,
+                                                                       config.log)
 
     def _contains_isim_query(self) -> str | None:
         if '#query' not in self.params:
