@@ -24,8 +24,3 @@ Finally, the function will also have access to all macros defined in `manager.co
              isim_manager (hy.I.manager/isim.get_isim_manager)]
          ~@body))
      result))
-
-(defmacro field-in-parameters [field [value None]]
-  `(do
-    (hy.I.manager/config.log.debug "Parameters: %s" parameters)
-    ))
