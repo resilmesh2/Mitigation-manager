@@ -153,7 +153,6 @@ async def get_condition(request: Request) -> HTTPResponse:
                 - identifier
                 - params
                 - args
-                - query
                 - checks
               properties:
                   identifier:
@@ -220,7 +219,6 @@ async def post_condition(request: Request) -> HTTPResponse:
               - identifier
               - params
               - args
-              - query
               - checks
             properties:
                 identifier:
@@ -317,12 +315,6 @@ async def get_node(request: Request) -> HTTPResponse:
                   type: string
                   description: The associated MITRE ATT&CK technique.
                   example: T0001
-                conditions:
-                  type: array
-                  description: The list of condition IDs.
-                  items:
-                    type: integer
-                    example: 123
                 probabilities:
                   type: array
                   description: The history of probabilities.
@@ -330,17 +322,26 @@ async def get_node(request: Request) -> HTTPResponse:
                     type: number
                     format: float
                     example: 0.77
+                description:
+                  type: string
+                  example: An attacker takes advantage of a system.
+                conditions:
+                  type: array
+                  description: The list of condition IDs.
+                  items:
+                    type: integer
+                    example: 123
             example:
               identifier: 123
               technique: T0001
-              conditions:
-                - 456
-                - 789
               probabilities:
                 - 0.1
                 - 0.5
                 - 0.44
                 - 0.98
+              description: An attacker takes advantage of a system.
+              conditions:
+                - 123
       '404':
         description: No node with such ID was found.
     """  # noqa: W505 RUF100
@@ -374,12 +375,6 @@ async def post_node(request: Request) -> HTTPResponse:
                 type: string
                 description: The associated MITRE ATT&CK technique.
                 example: T0001
-              conditions:
-                type: array
-                description: The list of condition IDs.
-                items:
-                  type: integer
-                  example: 123
               probabilities:
                 type: array
                 description: The history of probabilities.
@@ -387,24 +382,34 @@ async def post_node(request: Request) -> HTTPResponse:
                   type: number
                   format: float
                   example: 0.77
+              description:
+                type: string
+                example: An attacker takes advantage of a system.
+              conditions:
+                type: array
+                description: The list of condition identifiers that must be satisfied before the workflow can run.
+                items:
+                  type: integer
+                  example: 123
           example:
             identifier: 123
             technique: T0001
-            conditions:
-              - 456
-              - 789
             probabilities:
               - 0.1
               - 0.5
               - 0.44
               - 0.98
+            description: An attacker takes advantage of a system.
+            conditions:
+              - 123
     """  # noqa: W505 RUF100
     node = request.json
     log.info('Parsing node')
     await get_state_manager().store_node(AttackNode(node['identifier'],
                                                     node['technique'],
                                                     [DummyCondition(c_id) for c_id in node['conditions']],
-                                                    node['probabilities']))
+                                                    node['probabilities'],
+                                                    node['description']))
     return empty(200)
 
 
