@@ -100,7 +100,7 @@ class StateManager:
         Returns `None` if the condition can't be found.
         """
         query = """
-        SELECT identifier, params, args, query, check
+        SELECT identifier, condition_name, condition_description, params, args, checkstring
         FROM Conditions
         WHERE identifier = ?
         """
@@ -201,7 +201,7 @@ class StateManager:
         Returns `None` if the workflow can't be found.
         """
         query = """
-        SELECT identifier, workflow_name, workflow_desc, url, effective_attacks, cost, params, args
+        SELECT identifier, workflow_name, workflow_desc, url, effective_attacks, cost, params, args, conditions
         FROM Workflows
         WHERE identifier = ?
         """
