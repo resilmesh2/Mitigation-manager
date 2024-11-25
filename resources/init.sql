@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS Workflows (
 );
 
 
--- Example attack graph 1: Someone connects, adds +x to a script and executes it.
+-- Example attack graph 1: Someone connects, adds +x to a script, then gets ransomware somewhere and runs it.
 INSERT OR IGNORE INTO AttackGraphs
 (identifier, attack_name, initial_node)
 VALUES (100,
@@ -45,12 +45,13 @@ VALUES (100,
        100);
 
 INSERT OR IGNORE INTO AttackNodes
-(identifier, prv, nxt, technique, description)
+(identifier, prv, nxt, technique, description, conditions)
 VALUES (100,
        NULL,
        101,
        'T1041',
-       'Someone randomly connects using ncat');
+       'Someone randomly connects using ncat',
+       '100');
 
 INSERT OR IGNORE INTO AttackNodes
 (identifier, prv, nxt, technique, description)
@@ -67,6 +68,15 @@ VALUES (102,
        NULL,
        'T1204.002',
        'Someone downloads a known ransomware script using the previous Python script, and the rest is history');
+
+INSERT OR IGNORE INTO Conditions
+(identifier, condition_name, condition_description, params, args, checkstring)
+VALUES (100,
+       'Alert condition met',
+       'The alert contains a field indicating that a condition has been met',
+       '{"condition_met": "Always true"}',
+       '{}',
+       '(in "condition_met" parameters)');
 
 -- Example workflows: close ncat connection, delete file, handle ransomware.
 INSERT OR IGNORE INTO Workflows
