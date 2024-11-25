@@ -434,7 +434,7 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
     log.info('Advancing attack front')
     log.debug('Current attack front:  %s', [n.identifier for n in state])
     for node in state:
-        if alert.triggers(node):
+        if await node.is_triggered(alert):
             await get_state_manager().mark_complete(node)
             if node.nxt is not None:
                 log.debug('Advancing state from node %s to %s', node.identifier, node.nxt.identifier)

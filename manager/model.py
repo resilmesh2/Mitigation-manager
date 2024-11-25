@@ -238,6 +238,10 @@ class AttackNode:
         self.nxt = tmp
         return tmp
 
+    async def is_triggered(self, alert: Alert) -> bool:
+        """Check whether the alert triggers the current node."""
+        return alert.triggers(self) and all([await c.is_met(alert) for c in self.conditions])
+
     def _factor_1(self, graph_interest: float = config.GRAPH_INTEREST) -> float:
         """Return the first factor used in calculating probability.
 
