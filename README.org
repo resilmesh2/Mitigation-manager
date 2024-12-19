@@ -193,188 +193,276 @@ following command.
 #+RESULTS[9f7b03a3714ec7fd9ea2e346a74ea044c02dbc97]: mitigation-manager-port
 : 8333
 
-#+NAME: example-rule-100002
-#+begin_src python :session :results verbatim
-  """
-  {
-    "timestamp": "2024-10-22T09:31:15.007+0000",
-    "rule": {
-      "level": 14,
-      "description": "Connection via ncat from source port 11234 to 192.168.200.1:36210. PID: 3613",
-      "id": "100002",
-      "mitre": {
-        "id": [
-          "T1041",
-          "T1219"
-        ],
-        "tactic": [
-          "Exfiltration",
-          "Command and Control"
-        ],
-        "technique": [
-          "Exfiltration Over C2 Channel",
-          "Remote Access Software"
-        ]
+#+NAME: example-dummy-alert
+#+begin_src python :cache yes :results verbatim
+  from json import dumps
+
+  alert = {
+      'timestamp': '2024-10-22T09:31:15.007+0000',
+      'rule': {
+          '#condition': True,
       },
-      "firedtimes": 1,
-      "mail": true,
-      "groups": [
-        "established_conn"
-      ]
-    },
-    "agent": {
-      "id": "001",
-      "name": "eeb0036baf28",
-      "ip": "192.168.200.200"
-    },
-    "manager": {
-      "name": "wazuh.manager"
-    },
-    "id": "1729589475.25117",
-    "full_log": "ncat 3613 848a20e98d52:11234->192.168.200.1:36210",
-    "decoder": {
-      "name": "lsof_ncat_decoder"
-    },
-    "data": {
-      "pid": "3613",
-      "src_port": "11234",
-      "dst_ip": "192.168.200.1",
-      "dst_port": "36210"
-    },
-    "location": "command_ncat_conn"
   }
-  """
+
+  return dumps(alert)
 #+end_src
 
-#+NAME: example-rule-100003
-#+begin_src python :session :results verbatim
-  """
-  {
-    "timestamp": "2024-10-22T09:18:46.153+0000",
-    "rule": {
-      "level": 8,
-      "description": "Execute permission added to python script.",
-      "id": "100003",
-      "mitre": {
-        "id": [
-          "T1222.002"
-        ],
-        "tactic": [
-          "Defense Evasion"
-        ],
-        "technique": [
-          "Linux and Mac File and Directory Permissions Modification"
-        ]
+#+RESULTS[9ae5dbf5cf8aadced294ca41d7c47a54caf563e3]: example-dummy-alert
+: {"timestamp": "2024-10-22T09:31:15.007+0000", "rule": {"#condition": true}}
+
+#+NAME: example-rule-100002
+#+begin_src python :cache yes :results verbatim
+  from json import dumps
+
+  alert = {
+      'timestamp': '2024-10-22T09:31:15.007+0000',
+      'rule': {
+          'level': 14,
+          'description': 'Connection via ncat from source port 11234 to 192.168.200.1:36210. PID: 3613',
+          'id': '100002',
+          'mitre': {
+              'id': [
+                  'T1041',
+                  'T1219',
+              ],
+              'tactic': [
+                  'Exfiltration',
+                  'Command and Control',
+              ],
+              'technique': [
+                  'Exfiltration Over C2 Channel',
+                  'Remote Access Software',
+              ],
+          },
+          'firedtimes': 1,
+          'mail': True,
+          'groups': [
+              'established_conn',
+          ],
       },
-      "firedtimes": 4,
-      "mail": false,
-      "groups": [
-        "syscheck"
-      ]
-    },
-    "agent": {
-      "id": "001",
-      "name": "eeb0036baf28",
-      "ip": "192.168.200.200"
-    },
-    "manager": {
-      "name": "wazuh.manager"
-    },
-    "id": "1729588726.22091",
-    "full_log": "File '/tmp/zerologon_tester.py' modified\nMode: realtime\nChanged attributes: permission\nPermissions changed from 'rw-r--r--' to 'rwxr-xr-x'\n",
-    "syscheck": {
-      "path": "/tmp/zerologon_tester.py",
-      "mode": "realtime",
-      "size_after": "3041",
-      "perm_before": "rw-r--r--",
-      "perm_after": "rwxr-xr-x",
-      "uid_after": "0",
-      "gid_after": "0",
-      "md5_after": "0008432c27c43f9fe58e9bf191f9c6cf",
-      "sha1_after": "84dc56d99268f70619532536f8445f56609547c7",
-      "sha256_after": "b8ae48c2e46c28f1004e006348af557c7d912036b9ead88be67bca2bafde01d3",
-      "uname_after": "root",
-      "gname_after": "root",
-      "mtime_after": "2024-10-22T09:16:02",
-      "inode_after": 151477998,
-      "changed_attributes": [
-        "permission"
-      ],
-      "event": "modified"
-    },
-    "decoder": {
-      "name": "syscheck_integrity_changed"
-    },
-    "location": "syscheck"
+      'agent': {
+          'id': '001',
+          'name': 'eeb0036baf28',
+          'ip': '192.168.200.200',
+      },
+      'manager': {
+          'name': 'wazuh.manager',
+      },
+      'id': '1729589475.25117',
+      'full_log': 'ncat 3613 848a20e98d52:11234->192.168.200.1:36210',
+      'decoder': {
+          'name': 'lsof_ncat_decoder',
+      },
+      'data': {
+          'pid': '3613',
+          'src_port': '11234',
+          'dst_ip': '192.168.200.1',
+          'dst_port': '36210',
+      },
+      'location': 'command_ncat_conn',
   }
-  """
+
+  return dumps(alert)
+#+end_src
+
+#+RESULTS[6af2a515a309572d03d2ceeccc84a3fee080814e]: example-rule-100002
+: {"timestamp": "2024-10-22T09:31:15.007+0000", "rule": {"level": 14, "description": "Connection via ncat from source port 11234 to 192.168.200.1:36210. PID: 3613", "id": "100002", "mitre": {"id": ["T1041", "T1219"], "tactic": ["Exfiltration", "Command and Control"], "technique": ["Exfiltration Over C2 Channel", "Remote Access Software"]}, "firedtimes": 1, "mail": true, "groups": ["established_conn"]}, "agent": {"id": "001", "name": "eeb0036baf28", "ip": "192.168.200.200"}, "manager": {"name": "wazuh.manager"}, "id": "1729589475.25117", "full_log": "ncat 3613 848a20e98d52:11234->192.168.200.1:36210", "decoder": {"name": "lsof_ncat_decoder"}, "data": {"pid": "3613", "src_port": "11234", "dst_ip": "192.168.200.1", "dst_port": "36210"}, "location": "command_ncat_conn"}
+
+#+NAME: example-rule-100003
+#+begin_src python :cache yes :results verbatim
+  from json import dumps
+
+  alert = {
+      'timestamp': '2024-10-22T09:18:46.153+0000',
+      'rule': {
+          'level': 8,
+          'description': 'Execute permission added to python script.',
+          'id': '100003',
+          'mitre': {
+              'id': [
+                  'T1222.002',
+              ],
+              'tactic': [
+                  'Defense Evasion',
+              ],
+              'technique': [
+                  'Linux and Mac File and Directory Permissions Modification',
+              ],
+          },
+          'firedtimes': 4,
+          'mail': False,
+          'groups': [
+              'syscheck',
+          ],
+      },
+      'agent': {
+          'id': '001',
+          'name': 'eeb0036baf28',
+          'ip': '192.168.200.200',
+      },
+      'manager': {
+          'name': 'wazuh.manager',
+      },
+      'id': '1729588726.22091',
+      'full_log': 'File \'/tmp/zerologon_tester.py\' modified\n'
+      'Mode: realtime\n'
+      'Changed attributes: permission\n'
+      'Permissions changed from \'rw-r--r--\' to \'rwxr-xr-x\'\n',
+      'syscheck': {
+          'path': '/tmp/zerologon_tester.py',
+          'mode': 'realtime',
+          'size_after': '3041',
+          'perm_before': 'rw-r--r--',
+          'perm_after': 'rwxr-xr-x',
+          'uid_after': '0',
+          'gid_after': '0',
+          'md5_after': '0008432c27c43f9fe58e9bf191f9c6cf',
+          'sha1_after': '84dc56d99268f70619532536f8445f56609547c7',
+          'sha256_after': 'b8ae48c2e46c28f1004e006348af557c7d912036b9ead88be67bca2bafde01d3',
+          'uname_after': 'root',
+          'gname_after': 'root',
+          'mtime_after': '2024-10-22T09:16:02',
+          'inode_after': 151477998,
+          'changed_attributes': [
+              'permission',
+          ],
+          'event': 'modified',
+      },
+      'decoder': {
+          'name': 'syscheck_integrity_changed',
+      },
+      'location': 'syscheck',
+  }
+
+  return dumps(alert)
 #+end_src
 
 #+NAME: example-rule-100004
-#+begin_src python :session :results verbatim
-  """
-  {
-    "timestamp": "2024-10-22T09:25:39.991+0000",
-    "rule": {
-      "level": 8,
-      "description": "Executable file added to filesystem",
-      "id": "100004",
-      "mitre": {
-        "id": [
-          "T1204.002"
-        ],
-        "tactic": [
-          "Execution"
-        ],
-        "technique": [
-          "Malicious File"
-        ]
+#+begin_src python :cache yes :results verbatim
+  from json import dumps
+
+  alert = {
+      'timestamp': '2024-10-22T09:25:39.991+0000',
+      'rule': {
+          'level': 8,
+          'description': 'Executable file added to filesystem',
+          'id': '100004',
+          'mitre': {
+              'id': [
+                  'T1204.002',
+              ],
+              'tactic': [
+                  'Execution',
+              ],
+              'technique': [
+                  'Malicious File',
+              ],
+          },
+          'firedtimes': 8,
+          'mail': False,
+          'groups': [
+              'filesystem',
+          ],
       },
-      "firedtimes": 8,
-      "mail": false,
-      "groups": [
-        "filesystem"
-      ]
-    },
-    "agent": {
-      "id": "001",
-      "name": "eeb0036baf28",
-      "ip": "192.168.200.200"
-    },
-    "manager": {
-      "name": "wazuh.manager"
-    },
-    "id": "1729589139.24598",
-    "full_log": "File '/tmp/zerologon_tester.py' added\nMode: realtime\n",
-    "syscheck": {
-      "path": "/tmp/zerologon_tester.py",
-      "mode": "realtime",
-      "size_after": "3041",
-      "perm_after": "rw-r--r--",
-      "uid_after": "0",
-      "gid_after": "0",
-      "md5_after": "0008432c27c43f9fe58e9bf191f9c6cf",
-      "sha1_after": "84dc56d99268f70619532536f8445f56609547c7",
-      "sha256_after": "b8ae48c2e46c28f1004e006348af557c7d912036b9ead88be67bca2bafde01d3",
-      "uname_after": "root",
-      "gname_after": "root",
-      "mtime_after": "2024-10-22T09:25:39",
-      "inode_after": 151477998,
-      "event": "added"
-    },
-    "decoder": {
-      "name": "syscheck_new_entry"
-    },
-    "location": "syscheck"
+      'agent': {
+          'id': '001',
+          'name': 'eeb0036baf28',
+          'ip': '192.168.200.200',
+      },
+      'manager': {
+          'name': 'wazuh.manager',
+      },
+      'id': '1729589139.24598',
+      'full_log': 'File \'/tmp/zerologon_tester.py\' added\nMode: realtime\n',
+      'syscheck': {
+          'path': '/tmp/zerologon_tester.py',
+          'mode': 'realtime',
+          'size_after': '3041',
+          'perm_after': 'rw-r--r--',
+          'uid_after': '0',
+          'gid_after': '0',
+          'md5_after': '0008432c27c43f9fe58e9bf191f9c6cf',
+          'sha1_after': '84dc56d99268f70619532536f8445f56609547c7',
+          'sha256_after': 'b8ae48c2e46c28f1004e006348af557c7d912036b9ead88be67bca2bafde01d3',
+          'uname_after': 'root',
+          'gname_after': 'root',
+          'mtime_after': '2024-10-22T09:25:39',
+          'inode_after': 151477998,
+          'event': 'added',
+      },
+      'decoder': {
+          'name': 'syscheck_new_entry',
+      },
+      'location': 'syscheck',
   }
-  """
+
+  return dumps(alert)
 #+end_src
+
+#+NAME: example-condition
+#+begin_src python :cache yes :var _id=example-condition-id :results verbatim
+  from json import dumps
+
+  condition = {
+      'identifier': _id,
+      'params': {
+          'a': True,
+      },
+      'args': {
+          'b': 'alert.b',
+      },
+      'query': 'MATCH (i:IP) RETURN i LIMIT 50',
+      'checks': [1, 2, 3],
+  }
+
+  return dumps(condition)
+#+end_src
+
+#+NAME: example-workflow
+#+begin_src python :cache yes :var _id=example-workflow-id :results verbatim
+  from json import dumps
+
+  workflow = {
+      'identifier': _id,
+      'name': 'delete_file',
+      'description': 'Deletes a file from a machine.',
+      'url': 'http://localhost/asdasdsadsadsadsad',
+      'effective_attacks': [
+          'T0001',
+      ],
+      'cost': 10,
+      'params': {
+          'a': True,
+      },
+      'args': {
+          'b': 'alert.b',
+      },
+  }
+
+  return dumps(workflow)
+#+end_src
+
+#+NAME: example-condition-id
+#+begin_src emacs-lisp :cache yes
+  "123"
+#+end_src
+
+#+RESULTS[0d0afa27dccb70d8318efb0328b0a99841806892]: example-condition-id
+: 123
+
+#+NAME: example-workflow-id
+#+begin_src emacs-lisp :cache yes
+  "123"
+#+end_src
+
+#+RESULTS[0d0afa27dccb70d8318efb0328b0a99841806892]: example-workflow-id
+: 123
 
 ** Code blocks
 
 #+NAME: docker-compose-run
 #+begin_src sh :var file="docker-compose.yaml" :results verbatim
-  docker compose -f $file up -d 2>&1
+  docker compose -f $file up -d 2>&1p
 #+end_src
 
 #+NAME: docker-compose-kill
@@ -382,6 +470,32 @@ following command.
   cd $dir
 
   docker compose -f $file down --remove-orphans 2>&1
+#+end_src
+
+#+NAME: mitigation-manager-get-condition
+#+begin_src verb :wrap src ob-verb-response
+  GET http://localhost:{{(org-sbe mitigation-manager-port)}}/api/condition?id={{(org-sbe example-condition-id)}}
+#+end_src
+
+#+NAME: mitigation-manager-store-condition
+#+begin_src verb :wrap src ob-verb-response
+  POST http://localhost:{{(org-sbe mitigation-manager-port)}}/api/condition
+  Content-Type: application/json
+
+  {{(org-sbe example-condition)}}
+#+end_src
+
+#+NAME: mitigation-manager-get-workflow
+#+begin_src verb :wrap src ob-verb-response
+  GET http://localhost:{{(org-sbe mitigation-manager-port)}}/api/workflow?id={{(org-sbe example-workflow-id)}}
+#+end_src
+
+#+NAME: mitigation-manager-store-workflow
+#+begin_src verb :wrap src ob-verb-response
+  POST http://localhost:{{(org-sbe mitigation-manager-port)}}/api/workflow
+  Content-Type: application/json
+
+  {{(org-sbe example-workflow)}}
 #+end_src
 
 #+NAME: mitigation-manager-get-version
