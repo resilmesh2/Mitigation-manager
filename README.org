@@ -1,10 +1,7 @@
-#+TITLE: Mitigation Engine
+#+TITLE: Mitigation Manager
 
 This project contains all the necessary resources to build and deploy the
-Mitigation Engine on the ResilMesh network.
-
-# DONE: Think about turning project into a web server (to be able to query it
-# for details/etc), or if just a NATS relay is fine.
+Mitigation Manager on the ResilMesh network.
 
 # TODO: Edit the CRUSOE stage to contact the ISIM, use the information to do
 # basic workflow pruning?
@@ -188,7 +185,7 @@ mitigate any current threats and return the network into a lower state of risk.
 
 * Deployment
 
-The Mitigation Engine is packaged inside a Docker image and deployed using
+The Mitigation Manager is packaged inside a Docker image and deployed using
 Docker Compose.
 
 ** Creating the ResilMesh network
@@ -206,9 +203,7 @@ following command.
   docker network create --subnet 192.168.200.0/24 --gateway=192.168.200.1 resilmesh_network
 #+end_src
 
-#+RESULTS: mitigation-manager-create-network
-
-** Launching the Mitigation Engine
+** Launching the Mitigation Manager
 
 #+NAME: mitigation-manager-run
 #+begin_src sh
