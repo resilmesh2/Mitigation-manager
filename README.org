@@ -3,11 +3,6 @@
 This project contains all the necessary resources to build and deploy the
 Mitigation Manager on the ResilMesh network.
 
-# TODO: Edit the CRUSOE stage to contact the ISIM, use the information to do
-# basic workflow pruning?
-
-# TODO Start shaping up the attack flow part
-
 # TODO An idea I had is that we could build out our own attack graphs based on
 # the network events.  I don't know how much "attack mitigation" this is as
 # opposed to detection/forensics/etc, but it's definitely related to choosing
@@ -18,26 +13,11 @@ Mitigation Manager on the ResilMesh network.
 # match any of our predefined attack graphs, but we can store this "mini attack
 # graph" and use it in the future when we detect X-Y to prevent Z in advance.
 
-# TODO Are all alerts received by the Mitigation Manager associated to a MITRE
-# ATT&CK?  If so, the logic is simplified a lot to building and checking against
-# attack graphs, otherwise we might have to think about making our own "attack
-# patterns".
-
 # TODO There's two types of alerts: attacks (i.e. "this malicious file has been
 # downloaded") and attack preconditions (i.e. "This device connected to IP
 # a.b.c.d").  Attacks are what (potentially) trigger an update to the current
 # threat state, attack preconditions are what are used to potentially predict an
 # attack coming in soon.
-
-# TODO Basic mitigation manager flow: 1) Update situation based on SIEM
-# alerts/risk score/etc, 2) If appropriate, begin mitigation selection: 3)
-# Determine mitigation parameters (max mitigation cost, devices to apply
-# mitigation to, etc), 4) Filter out mitigations based on the conditions and 5)
-# Apply the best mitigations from the available ones, or none if there were no
-# good ones.
-
-# TODO Steps 3 and 4 are basically what the solver does, so my direct
-# contribution would be to perhaps update the solver parameters and that's it.
 
 # TODO There's something to be said about MITRE tactics.  When receiving alerts
 # with MITRE ATT&CK IDs associated with them, we use them to update the current
@@ -52,20 +32,6 @@ Mitigation Manager on the ResilMesh network.
 # will almost certainly never do that again, and so any additional alerts
 # corresponding to initial access will most likely come from other attacks and
 # thus require separate attack graphs to be built.
-
-# TODO There could be three types of mitigations: active (regarding the current
-# alert), proactive (regarding the predicted next alert), and reactive
-# (regarding the current alert, but based on the previous alert).  Active
-# mitigations have to be chosen fast so anything AI or MILP related is out of
-# the question - we'll have workflow pruning based on CSA and select the lowest
-# cost one.  Proactive mitigations should be based on the risk score (the
-# riskier the situation, the more likely the attacker will indeed make
-# progress).  Reactive mitigations are MILP solutions for mitigating the
-# predicted next alert deferred to an external process to be solved and then
-# stored in memory.  When receiving the next alert, if the attack ID matches one
-# of the precomputed MILP solutions then the solution is applied - this results
-# in expensive MILP computations being done ahead of time in order to have the
-# fastest response time possible.
 
 * List of abbreviations
 
