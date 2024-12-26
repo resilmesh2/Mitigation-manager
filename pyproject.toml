@@ -53,8 +53,6 @@ select = [
 ignore = [
     "ANN002",  # Allow untyped `*args`
     "ANN003",  # Allow untyped `**kwargs`
-    "ANN101",  # Deprecated
-    "ANN102",  # Deprecated
 
     "D100",    # Allow undocumented public modules
     "D101",    # Allow undocumented public classes
@@ -62,7 +60,7 @@ ignore = [
     "D107",    # Allow undocumented public __init__
 ]
 
-logger-objects = ["anonymizer.config.log"]
+logger-objects = ["manager.config.log"]
 
 [tool.ruff.lint.per-file-ignores]
 "test/*" = [
