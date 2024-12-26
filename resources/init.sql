@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS Conditions (
-    identifier INT PRIMARY KEY,
+    identifier INTEGER PRIMARY KEY,
     condition_name TEXT,
     condition_description TEXT,
     params TEXT NOT NULL DEFAULT '{}',
@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS Conditions (
 );
 
 CREATE TABLE IF NOT EXISTS AttackNodes (
-    identifier INT PRIMARY KEY,
+    identifier INTEGER PRIMARY KEY,
     prv INT,
     nxt INT,
     technique TEXT NOT NULL,
@@ -18,14 +18,14 @@ CREATE TABLE IF NOT EXISTS AttackNodes (
 );
 
 CREATE TABLE IF NOT EXISTS AttackGraphs (
-    identifier INT PRIMARY KEY,
+    identifier INTEGER PRIMARY KEY,
     attack_name TEXT,
     initial_node INT,
     attack_front INT DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS Workflows (
-    identifier INT PRIMARY KEY,
+    identifier INTEGER PRIMARY KEY,
     workflow_name TEXT,
     workflow_desc TEXT NULL,
     url TEXT,
