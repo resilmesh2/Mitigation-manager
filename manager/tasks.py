@@ -36,7 +36,7 @@ async def handle_alert(alert: dict):
         return
 
 
-async def _apply_immediate_mitigation(nodes: list[AttackNode], alert: Alert):
+async def _apply_immediate_mitigation(nodes: set[AttackNode], alert: Alert):
     for node in nodes:
         log.debug('Resolving optimal workflow for attack node')
         wf = await workflows.locate(node)
