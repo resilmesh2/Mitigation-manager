@@ -86,13 +86,14 @@ class StateManager:
     def __init__(self, connection: Connection) -> None:
         self.connection = connection
 
-    async def _extract_condition_parameters(self, row: Row) -> tuple[int, str, str, dict, dict, str]:
-        return (row['identifier'],
-                row['condition_name'],
-                row['condition_description'],
-                loads(row['params']),
-                loads(row['args']),
-                row['checkstring'])
+    async def _row_to_condition(self, row: Row) -> Condition:
+        identifier = int(row['identifier'])
+        condition_name: str = row['condition_name']
+        condition_description: str = row['condition_description']
+        params: dict = loads(row['params'])
+        args: dict = loads(row['args'])
+        checkstring: str = row['checkstring']
+        return Condition(identifier, condition_name, condition_description, params, args, checkstring)
 
     async def retrieve_condition(self, identifier: int) -> Condition | None:
         """Return the condition specified by the identifier.
@@ -100,7 +101,7 @@ class StateManager:
         Returns `None` if the condition can't be found.
         """
         query = """
-        SELECT identifier, condition_name, condition_description, params, args, checkstring
+        SELECT *
         FROM Conditions
         WHERE identifier = ?
         """
@@ -109,7 +110,7 @@ class StateManager:
             row = await cursor.fetchone()
             if row is None:
                 return None
-            return Condition(*await self._extract_condition_parameters(row))
+            return await self._row_to_condition(row)
 
     async def store_condition(self, condition: Condition) -> None:
         """Store a condition."""
@@ -125,13 +126,16 @@ class StateManager:
                                               dumps(condition.args),
                                               condition.check))
 
-    async def _row_to_node_parameters(self, row: Row) -> tuple[int, str, list[Condition], list[float], str]:
+    async def _row_to_attack_node(self, row: Row) -> AttackNode:
         identifier = int(row['identifier'])
-        technique: str = row['technique']
-        conditions = [await self.retrieve_condition(c) for c in self._mklist(row['conditions'], int)]
+        technique = row['technique']
+        conditions = [c
+                      for c in [await self.retrieve_condition(c)
+                                for c in self._mklist(row['conditions'], int)]
+                      if c is not None]
         probabilities = self._mklist(row['probabilities'], float)
         description = row['description']
-        return (identifier, technique, [e for e in conditions if e is not None], probabilities, description)
+        return AttackNode(identifier, technique, conditions, probabilities, description)
 
     async def retrieve_node(self, identifier: int) -> AttackNode | None:
         """Return the attack specified by the identifier.
@@ -141,7 +145,7 @@ class StateManager:
         `prv` and `nxt` values will be `None`.
         """
         query = """
-        SELECT identifier, technique, conditions, probabilities, description
+        SELECT *
         FROM AttackNodes
         WHERE identifier = ?
         """
@@ -150,7 +154,7 @@ class StateManager:
             row = await cursor.fetchone()
             if row is None:
                 return None
-            return AttackNode(*await self._row_to_node_parameters(row))
+            return await self._row_to_attack_node(row)
 
     async def store_node(self, node: AttackNode) -> None:
         """Store a node.
@@ -173,27 +177,20 @@ class StateManager:
                       node.description)
         await self.connection.execute(query, parameters)
 
-    async def _extract_workflow_parameters(self, row: Row) -> tuple[int,
-                                                                    LiteralString,
-                                                                    str,
-                                                                    WorkflowUrl,
-                                                                    list[MitreTechnique],
-                                                                    int,
-                                                                    dict,
-                                                                    dict,
-                                                                    list[Condition]]:
+    async def _row_to_workflow(self, row: Row) -> Workflow:
         identifier = int(row['identifier'])
-        name = row['workflow_name']
-        desc = row['workflow_desc']
-        url = row['url']
-        effective_attacks = self._mklist(row['effective_attacks'], str)
-        cost = int(row['cost'])
-        params = loads(row['params'])
-        args = loads(row['args'])
-        conditions = [await self.retrieve_condition(i) for i in self._mklist(row['conditions'], int)]
-        return (identifier, name, desc, url, effective_attacks, cost, params, args, [c
-                                                                                     for c in conditions
-                                                                                     if c is not None])
+        name: LiteralString = row['workflow_name']
+        desc: str = row['workflow_desc']
+        url: str = row['url']
+        effective_attacks: list[str] = self._mklist(row['effective_attacks'], str)
+        cost: int = int(row['cost'])
+        params: dict = loads(row['params'])
+        args: dict = loads(row['args'])
+        conditions: list[Condition] = [c
+                                       for c in [await self.retrieve_condition(i)
+                                                 for i in self._mklist(row['conditions'], int)]
+                                       if c is not None]
+        return Workflow(identifier, name, desc, url, effective_attacks, cost, params, args, conditions)
 
     async def retrieve_workflow(self, identifier: int) -> Workflow | None:
         """Return the workflow specified by the identifier.
@@ -201,7 +198,7 @@ class StateManager:
         Returns `None` if the workflow can't be found.
         """
         query = """
-        SELECT identifier, workflow_name, workflow_desc, url, effective_attacks, cost, params, args, conditions
+        SELECT *
         FROM Workflows
         WHERE identifier = ?
         """
@@ -210,7 +207,7 @@ class StateManager:
             row = await cursor.fetchone()
             if row is None:
                 return None
-            return Workflow(*await self._extract_workflow_parameters(row))
+            return await self._row_to_workflow(row)
 
     async def store_workflow(self, workflow: Workflow) -> None:
         """Store a workflow.
