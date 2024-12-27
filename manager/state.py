@@ -4,8 +4,8 @@ from json import dumps, loads
 from typing import TYPE_CHECKING, LiteralString, TypeVar
 
 from manager import config
-from manager.model import AttackNode, Condition, MitreTechnique, Workflow, WorkflowUrl
 from manager.config import InvalidEnvironmentError, log
+from manager.model import Attack, AttackNode, Condition, MitreTechnique, Workflow
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -231,31 +231,25 @@ class StateManager:
                       self._mkstr(workflow.conditions, lambda c: str(c.identifier)))
         await self.connection.execute(query, parameters)
 
-    async def retrieve_state(self) -> list[AttackNode]:
-        """Return the list of current attack graphs.
+    async def _row_to_attack(self, row: Row) -> Attack:
+        identifier = int(row['identifier'])
+        attack_front = await self.retrieve_node(row['attack_front'])
+        if attack_front is None:
+            msg = 'Missing attack front node for attack'
+            raise InvalidDatabaseStateError(msg)
+        attack_front = await self.retrieve_full_graph(attack_front)
+        return Attack(identifier, attack_front)
 
-        The graphs are represented as a list of the last fulfilled
-        attack nodes, each linked to the previous/next nodes to form
-        the attack graph.
-        """
-        return [await self.retrieve_full_graph(n) for n in await self._retrieve_initial_nodes()]
-
-    async def _retrieve_initial_nodes(self) -> list[AttackNode]:
-        """Return the list of initial nodes for active attack graphs.
-
-        This method does not return full attack graphs - the nodes'
-        `prv` and `nxt` values will be `None`.
-        """
+    async def retrieve_attacks(self) -> list[Attack]:
+        """Return the list of current attacks."""
         ret = []
         query = """
-        SELECT an.*
-        FROM AttackGraphs AS ag
-        INNER JOIN AttackNodes AS an ON an.identifier = ag.initial_node
-        WHERE ag.attack_front IS NOT NULL
+        SELECT *
+        FROM Attacks
         """
         async with self.connection.execute(query) as cursor:
             async for row in cursor:
-                ret.append(AttackNode(*await self._row_to_node_parameters(row)))
+                ret.append(await self._row_to_attack(row))
         return ret
 
     async def retrieve_full_graph(self, initial_node: AttackNode) -> AttackNode:
@@ -281,9 +275,10 @@ class StateManager:
 
         # Retrieve the attack front
         query_for_attack_front = """
-        SELECT attack_front
-        FROM AttackGraphs
-        WHERE initial_node = ?
+        SELECT a.attack_front AS attack_front
+        FROM Attacks AS a
+        INNER JOIN AttackGraphs AS ag ON a.attack_graph = ag.identifier
+        WHERE ag.initial_node = ?
         """
         async with self.connection.execute(query_for_attack_front, (initial_node.identifier,)) as cursor:
             row = await cursor.fetchone()
@@ -315,8 +310,13 @@ class StateManager:
                 row = await cursor.fetchone()
                 if row is None:
                     return final_node.first()
-                row_params = await self._row_to_node_parameters(row)
-                final_node = final_node.then(*row_params)
+                node = await self._row_to_attack_node(row)
+                final_node = final_node.then(node.identifier,
+                                             node.technique,
+                                             node.conditions,
+                                             node.probability_history,
+                                             node.description)
+                del node
                 if attack_front == final_node.identifier:
                     ret = final_node
                 nxt = row['nxt']
@@ -330,7 +330,7 @@ class StateManager:
         """Return a list of eligible new attack graphs.
 
         An attack graph is eligible if its initial node is triggered
-        by the given alert.
+        by the given alert and the alert isn't being tracked already.
         """
         ret = []
         # Edge case: attackless alert
@@ -340,37 +340,85 @@ class StateManager:
         SELECT an.identifier AS identifier
         FROM AttackNodes AS an
         INNER JOIN AttackGraphs AS ag ON an.identifier = ag.initial_node
-        WHERE ag.attack_front IS NULL
         """
-        query_retrieve += f'AND ({" OR ".join("an.technique LIKE ?" for _ in alert.rule_mitre_ids)})'
+        query_retrieve += f'WHERE ({" OR ".join("an.technique LIKE ?" for _ in alert.rule_mitre_ids)})'
         parameters_retrieve = (*[f'%{attack}%' for attack in alert.rule_mitre_ids],)
         async with self.connection.execute(query_retrieve, parameters_retrieve) as cursor:
             async for row in cursor:
-                node = await self.retrieve_node(row['identifier'])
-                if node is None:
-                    msg = 'Missing initial node'
+                if row['identifier'] is None:
+                    msg = 'Attack node with null identifier'
                     raise InvalidDatabaseStateError(msg)
-                node = await self.retrieve_full_graph(node)
-                ret.append(node)
+                if not await self.already_tracked(alert, row['identifier']):
+                    node = await self.retrieve_node(row['identifier'])
+                    if node is None:
+                        msg = 'Missing initial node'
+                        raise InvalidDatabaseStateError(msg)
+                    node = await self.retrieve_full_graph(node)
+                    ret.append(node)
         return ret
 
-    async def mark_complete(self, node: AttackNode) -> bool:
-        """Mark the attack node as completed.
+    async def already_tracked(self, alert: Alert, attack: Attack) -> bool:
+        """Check if an alert is already mapped to an attack.
 
-        If there is a next node, mark it as the new attack front and
-        return `False`.  If there is no next node, mark the attack
-        graph as no longer taking place and return `True`.
+        The attack node's identifier is available for checks.
         """
-        attack_front = None if node.nxt is None else node.nxt.identifier
+        # TODO: Perhaps store some unique alert field as context in
+        #       the Attack table.
+        return False
 
-        query = """
-        UPDATE AttackGraphs
-        SET attack_front = ?
+    async def start_attack(self, node: AttackNode) -> Attack:
+        """Start tracking an attack graph.
+
+        The attack graph being tracked is the one whose initial node
+        is the argument's initial node.
+        """
+        query_graph = """
+        SELECT identifier
+        FROM AttackGraphs
         WHERE initial_node = ?
         """
-        parameters = (attack_front, node.first().identifier)
-        await self.connection.execute(query, parameters)
-        return attack_front is None
+        parameters_graph = (node.first().identifier,)
+        identifier = None
+        async with self.connection.execute(query_graph, parameters_graph) as cursor:
+            async for row in cursor:
+                identifier = row['identifier']
+        if identifier is None:
+            msg = 'Missing attack graph'
+            raise InvalidDatabaseStateError(msg)
+        query = """
+        INSERT INTO Attacks
+        (attack_graph, attack_front)
+        VALUES (?, ?)
+        """
+        parameters = (identifier, node.first().identifier)
+        cursor = await self.connection.execute(query, parameters)
+        identifier = cursor.lastrowid
+        if identifier is None:
+            msg = 'INSERT operation did not result in a row ID'
+            raise InvalidDatabaseStateError(msg)
+        return Attack(identifier, node)
+
+    async def advance(self, attack: Attack):
+        """Advance an attack."""
+        node = attack.attack_front
+        if node.nxt is not None:
+            attack_front = node.nxt
+            query = """
+            UPDATE Attacks
+            SET attack_front = ?
+            WHERE initial_node = ?
+            """
+            parameters = (attack_front, node.first().identifier)
+            await self.connection.execute(query, parameters)
+            attack.attack_front = attack_front
+        else:
+            query = """
+            DELETE FROM Attacks
+            WHERE initial_node = ?
+            """
+            parameters = (node.first().identifier,)
+            await self.connection.execute(query, parameters)
+            attack.is_complete = True
 
     async def update_probability(self, node: AttackNode):
         """Update the probability of a node."""
@@ -401,7 +449,7 @@ class StateManager:
         return ret
 
 
-async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list[AttackNode]]:
+async def update(alert: Alert) -> tuple[set[AttackNode], set[AttackNode], set[AttackNode]]:
     """Update the local state with an alert.
 
     Return 3 lists of nodes that should be mitigated:
@@ -409,46 +457,42 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
     - Nodes immediately related by the alert.
     - Nodes further along in the active attack graphs.
     """
-    state = await get_state_manager().retrieve_state()
+    state = await get_state_manager().retrieve_attacks()
 
-    new_state: list[AttackNode] = []
-    old_state: list[AttackNode] = []
+    past: set[AttackNode] = set()
+    present: set[AttackNode] = set()
+    future: set[AttackNode] = set()
 
-    past: list[AttackNode] = []
-    present: list[AttackNode] = []
-    future: list[AttackNode] = []
+    completed: list[Attack] = []
 
-    completed: list[AttackNode] = []
-
-    log.debug('Attack front before retrieving new attack graphs: %s', [n.identifier for n in state])
-
-    # 1: Add new attack graphs to the local state
-    new_attack_graphs = await get_state_manager().retrieve_new_graphs(alert)
-    log.debug('Retrieved %s new attack graphs', len(new_attack_graphs))
-    state.extend(new_attack_graphs)
-
-    # 2: Advance local state if necessary.
+    # 2: Advance state if necessary.
     log.info('Advancing attack front')
-    log.debug('Current attack front:  %s', [n.identifier for n in state])
-    for node in state:
-        if await node.is_triggered(alert):
-            await get_state_manager().mark_complete(node)
-            if node.nxt is not None:
-                log.debug('Advancing state from node %s to %s', node.identifier, node.nxt.identifier)
-                new_state.append(node.nxt)
+    log.debug('Current attack front:  %s', [a.identifier for a in state])
+    for attack in state:
+        if await attack.advanced_by(alert):
+            await get_state_manager().advance(attack)
+            if attack.is_complete:
+                log.debug('Attack %s was completed by the alert', attack.identifier)
+                completed.append(attack)
             else:
-                # Attack finished, but we might want to mitigate the
-                # attack tree.  Keep it for now.
-                log.debug('Attack graph with starting node %s was completed by this alert',
-                          node.first().identifier)
-                completed.append(node.first())
-            old_state.append(node)
-            continue
-        log.debug('Node %s did not change state', node.identifier)
+                assert attack.attack_front.prv is not None
+                log.debug('Advancing attack from node %s to %s',
+                          attack.attack_front.identifier,
+                          attack.attack_front.prv.identifier)
+        else:
+            log.debug('Attack %s did not change state', attack.identifier)
+
+    log.debug('Attack front after advancement: %s', [a.identifier for a in state])
+
+    # 1: Add new attacks to state
+    new_attack_graphs = await get_state_manager().retrieve_new_graphs(alert)
+    for graph in new_attack_graphs:
+        state.append(await get_state_manager().start_attack(graph))
+    log.debug('Started tracking %s new attacks', len(new_attack_graphs))
 
     # 3: Update probability percentages
     log.debug('Updating probabilities')
-    for n, p in [(n, await n.update_probability(alert)) for node in state for n in node.all()]:
+    for n, p in [(n, await n.update_probability(alert)) for node in state for n in node.attack_front.all()]:
         if p:
             await get_state_manager().update_probability(n)
 
@@ -456,28 +500,26 @@ async def update(alert: Alert) -> tuple[list[AttackNode], list[AttackNode], list
     log.debug('Committing changes to DB')
     await get_state_manager().connection.commit()
 
-    # Update local state
-    for n in old_state:
-        state.remove(n)
-    state.extend(new_state)
-
-    log.debug('The updated attack front is: %s', [n.identifier for n in state])
+    log.debug('Final attack front: %s', [a.identifier for a in state])
     log.info('Evaluating attack front')
 
-    for node in state:
+    # TODO: Move this elsewhere, and instead of mitigating by node
+    # mitigate by attack (run this check for all attacks, and use
+    # context to determine if they should be mitigated),
+    for attack in state:
         # Past: judge based on risk history
-        for n in node.all_before():
+        for n in attack.attack_front.all_before():
             if n.historically_risky():
                 log.debug('Node %s has been historically very risky, appending', n.identifier)
-                past.append(n)
+                past.add(n)
         # Present: only if it was related to this alert
-        if node.technique in alert.rule_mitre_ids:
-            log.debug('Node %s is directly impacted by the alert, appending', node.identifier)
-            present.append(node)
+        if attack.attack_front.technique in alert.rule_mitre_ids:
+            log.debug('Node %s is directly impacted by the alert, appending', attack.attack_front.identifier)
+            present.add(attack.attack_front)
         # Future: judge based on how likely it is
-        for n in node.all_after():
+        for n in attack.attack_front.all_after():
             if n.probability > config.PROBABILITY_TRESHOLD:
                 log.debug('Node %s is very likely to occur in the future, appending', n.identifier)
-                future.append(n)
+                future.add(n)
 
     return (past, present, future)

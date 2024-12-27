@@ -318,6 +318,18 @@ class AttackNode:
         return self.all_before() | {self} | self.all_after()
 
 
+class Attack:
+    def __init__(self, identifier: int, attack_front: AttackNode) -> None:
+        self.identifier = identifier
+        self.attack_graph = attack_front.first()
+        self.attack_front = attack_front
+        self.is_complete = False
+
+    async def advanced_by(self, alert: Alert) -> bool:
+        """Check whether an alert causes an attack to advance."""
+        return await self.attack_front.is_triggered(alert)
+
+
 class Workflow:
     def __init__(self,
                  identifier: int,

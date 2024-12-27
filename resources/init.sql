@@ -20,8 +20,13 @@ CREATE TABLE IF NOT EXISTS AttackNodes (
 CREATE TABLE IF NOT EXISTS AttackGraphs (
     identifier INTEGER PRIMARY KEY,
     attack_name TEXT,
-    initial_node INT,
-    attack_front INT DEFAULT NULL
+    initial_node INT
+);
+
+CREATE TABLE IF NOT EXISTS Attacks (
+    identifier INTEGER PRIMARY KEY,
+    attack_graph INT,
+    attack_front INT
 );
 
 CREATE TABLE IF NOT EXISTS Workflows (
