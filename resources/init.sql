@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS AttackGraphs (
 CREATE TABLE IF NOT EXISTS Attacks (
     identifier INTEGER PRIMARY KEY,
     attack_graph INT,
-    attack_front INT
+    attack_front INT,
+    context TEXT NOT NULL DEFAULT '{}'
 );
 
 CREATE TABLE IF NOT EXISTS Workflows (

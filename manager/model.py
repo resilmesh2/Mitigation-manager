@@ -319,15 +319,26 @@ class AttackNode:
 
 
 class Attack:
-    def __init__(self, identifier: int, attack_front: AttackNode) -> None:
+    def __init__(self, identifier: int, attack_front: AttackNode, context: dict) -> None:
         self.identifier = identifier
         self.attack_graph = attack_front.first()
         self.attack_front = attack_front
         self.is_complete = False
+        self.context = context
 
     async def advanced_by(self, alert: Alert) -> bool:
         """Check whether an alert causes an attack to advance."""
         return await self.attack_front.is_triggered(alert)
+
+    def retrieve_alert(self, node: AttackNode) -> Alert | None:
+        """Retrieve the alert that triggered a node.
+
+        Returns `None` if the node doesn't belong to the attack graph
+        or it hasn't been triggered yet.
+        """
+        if node.identifier in self.context:
+            return Alert(self.context[node.identifier])
+        return None
 
 
 class Workflow:

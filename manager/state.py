@@ -238,7 +238,8 @@ class StateManager:
             msg = 'Missing attack front node for attack'
             raise InvalidDatabaseStateError(msg)
         attack_front = await self.retrieve_full_graph(attack_front)
-        return Attack(identifier, attack_front)
+        context = loads(row['context'])
+        return Attack(identifier, attack_front, context)
 
     async def retrieve_attacks(self) -> list[Attack]:
         """Return the list of current attacks."""
@@ -396,27 +397,28 @@ class StateManager:
         if identifier is None:
             msg = 'INSERT operation did not result in a row ID'
             raise InvalidDatabaseStateError(msg)
-        return Attack(identifier, node)
+        return Attack(identifier, node, {})
 
-    async def advance(self, attack: Attack):
+    async def advance(self, attack: Attack, alert: Alert):
         """Advance an attack."""
         node = attack.attack_front
+        attack.context[node.identifier] = alert
         if node.nxt is not None:
             attack_front = node.nxt
             query = """
             UPDATE Attacks
-            SET attack_front = ?
-            WHERE initial_node = ?
+            SET attack_front = ?, context = ?
+            WHERE identifier = ?
             """
-            parameters = (attack_front, node.first().identifier)
+            parameters = (attack_front, attack.context, attack.identifier)
             await self.connection.execute(query, parameters)
             attack.attack_front = attack_front
         else:
             query = """
             DELETE FROM Attacks
-            WHERE initial_node = ?
+            WHERE identifier = ?
             """
-            parameters = (node.first().identifier,)
+            parameters = (attack.identifier)
             await self.connection.execute(query, parameters)
             attack.is_complete = True
 
@@ -470,7 +472,7 @@ async def update(alert: Alert) -> tuple[set[AttackNode], set[AttackNode], set[At
     log.debug('Current attack front:  %s', [a.identifier for a in state])
     for attack in state:
         if await attack.advanced_by(alert):
-            await get_state_manager().advance(attack)
+            await get_state_manager().advance(attack, alert)
             if attack.is_complete:
                 log.debug('Attack %s was completed by the alert', attack.identifier)
                 completed.append(attack)
