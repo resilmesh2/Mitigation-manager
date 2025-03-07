@@ -335,7 +335,8 @@ class StateManager:
         """
         ret = []
         # Edge case: attackless alert
-        if not alert.has_mitre_attacks():
+        if len(alert.techniques()) == 0:
+            log.warning('Alert has no MITRE Techniques, no new attack graphs triggered')
             return ret
         query_retrieve = """
         SELECT an.identifier AS identifier

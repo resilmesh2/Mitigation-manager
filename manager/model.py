@@ -95,15 +95,14 @@ class Alert(SimpleNamespace):
                 msg = f'Alert attribute {attr} is not the correct type (expected {clazz}, got {t})'
                 raise InvalidAlertError(msg)
 
-    def has_mitre_attacks(self) -> bool:
-        """Check if the alert has any associated MITRE ATT&CK IDs."""
-        return hasattr(self, 'rule_mitre_ids') and len(self.rule_mitre_ids) > 0
+    def techniques(self) -> list[str]:
+        """Return the associated MITRE Technique identifiers."""
+        return [] if not hasattr(self, 'rule_mitre_ids') else self.rule_mitre_ids
 
     def triggers(self, node: AttackNode) -> bool:
         """Check if the alert triggers the attack node."""
-        if not self.has_mitre_attacks():
-            return False
-        return node.technique in self.rule_mitre_ids
+        log.debug('Checking if %s is within %s', node.technique, self.techniques())
+        return node.technique in self.techniques()
 
 
 class Condition:
