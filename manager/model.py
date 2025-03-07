@@ -172,9 +172,7 @@ class Condition:
         (require manager.conditions *)
         (with-local-state {})
         """
-        return await hy.eval(hy.read_many(wrapper.format(self.check)))(self.parameters(_alert),
-                                                                       _alert,
-                                                                       config.log)
+        return await hy.eval(hy.read_many(wrapper.format(self.check)))(self.parameters(_alert), _alert, log)
 
     def _contains_isim_query(self) -> str | None:
         if '#query' not in self.params:
