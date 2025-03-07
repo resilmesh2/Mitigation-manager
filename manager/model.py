@@ -359,6 +359,11 @@ class Attack:
             return Alert(self.context[node.identifier])
         return None
 
+    def __str__(self) -> str:
+        return (f'Attack {self.identifier} '
+                f'on graph {self.attack_graph.identifier} '
+                f'node {self.attack_front.identifier}')
+
 
 class Workflow:
     def __init__(self,
