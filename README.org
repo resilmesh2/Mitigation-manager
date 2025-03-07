@@ -13,12 +13,6 @@ Mitigation Manager on the ResilMesh network.
 # match any of our predefined attack graphs, but we can store this "mini attack
 # graph" and use it in the future when we detect X-Y to prevent Z in advance.
 
-# TODO There's two types of alerts: attacks (i.e. "this malicious file has been
-# downloaded") and attack preconditions (i.e. "This device connected to IP
-# a.b.c.d").  Attacks are what (potentially) trigger an update to the current
-# threat state, attack preconditions are what are used to potentially predict an
-# attack coming in soon.
-
 # TODO There's something to be said about MITRE tactics.  When receiving alerts
 # with MITRE ATT&CK IDs associated with them, we use them to update the current
 # state and build attack graphs.  However, other than by checking against
@@ -186,11 +180,6 @@ following command.
 ** Variables
 
 #+NAME: mitigation-manager-port
-#+begin_src emacs-lisp :cache yes
-  "8333"
-#+end_src
-
-#+RESULTS[9f7b03a3714ec7fd9ea2e346a74ea044c02dbc97]: mitigation-manager-port
 : 8333
 
 #+NAME: example-dummy-alert
@@ -206,9 +195,6 @@ following command.
 
   return dumps(alert)
 #+end_src
-
-#+RESULTS[9ae5dbf5cf8aadced294ca41d7c47a54caf563e3]: example-dummy-alert
-: {"timestamp": "2024-10-22T09:31:15.007+0000", "rule": {"#condition": true}}
 
 #+NAME: example-rule-100002
 #+begin_src python :cache yes :results verbatim
@@ -264,9 +250,6 @@ following command.
 
   return dumps(alert)
 #+end_src
-
-#+RESULTS[6af2a515a309572d03d2ceeccc84a3fee080814e]: example-rule-100002
-: {"timestamp": "2024-10-22T09:31:15.007+0000", "rule": {"level": 14, "description": "Connection via ncat from source port 11234 to 192.168.200.1:36210. PID: 3613", "id": "100002", "mitre": {"id": ["T1041", "T1219"], "tactic": ["Exfiltration", "Command and Control"], "technique": ["Exfiltration Over C2 Channel", "Remote Access Software"]}, "firedtimes": 1, "mail": true, "groups": ["established_conn"]}, "agent": {"id": "001", "name": "eeb0036baf28", "ip": "192.168.200.200"}, "manager": {"name": "wazuh.manager"}, "id": "1729589475.25117", "full_log": "ncat 3613 848a20e98d52:11234->192.168.200.1:36210", "decoder": {"name": "lsof_ncat_decoder"}, "data": {"pid": "3613", "src_port": "11234", "dst_ip": "192.168.200.1", "dst_port": "36210"}, "location": "command_ncat_conn"}
 
 #+NAME: example-rule-100003
 #+begin_src python :cache yes :results verbatim
@@ -405,6 +388,8 @@ following command.
 
   condition = {
       'identifier': _id,
+      'name': 'Example name',
+      'description': 'Example description',
       'params': {
           'a': True,
       },
@@ -412,7 +397,7 @@ following command.
           'b': 'alert.b',
       },
       'query': 'MATCH (i:IP) RETURN i LIMIT 50',
-      'checks': [1, 2, 3],
+      'check':'(true)',
   }
 
   return dumps(condition)
@@ -443,19 +428,9 @@ following command.
 #+end_src
 
 #+NAME: example-condition-id
-#+begin_src emacs-lisp :cache yes
-  "123"
-#+end_src
-
-#+RESULTS[0d0afa27dccb70d8318efb0328b0a99841806892]: example-condition-id
 : 123
 
 #+NAME: example-workflow-id
-#+begin_src emacs-lisp :cache yes
-  "123"
-#+end_src
-
-#+RESULTS[0d0afa27dccb70d8318efb0328b0a99841806892]: example-workflow-id
 : 123
 
 ** Code blocks
@@ -466,9 +441,7 @@ following command.
 #+end_src
 
 #+NAME: docker-compose-kill
-#+begin_src sh :var dir="/" :var file="docker-compose.yaml" :results verbatim
-  cd $dir
-
+#+begin_src sh :var file="docker-compose.yaml" :results verbatim
   docker compose -f $file down --remove-orphans 2>&1
 #+end_src
 
