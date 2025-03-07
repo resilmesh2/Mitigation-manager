@@ -48,9 +48,28 @@ class Alert(SimpleNamespace):
         'rule_mitre_ids': list,
     }
 
-    def __init__(self, alert: dict) -> None:
-        self._set(alert, self.TRANSLATIONS)
-        self._validate()
+    @classmethod
+    def from_wazuh(cls, wazuh_alert: dict) -> Alert:
+        alert = Alert()
+        alert._set(wazuh_alert, alert.TRANSLATIONS)  # noqa: SLF001
+        alert._validate()  # noqa: SLF001
+
+        # In the future it might be a good idea to store the entire
+        # original alert as well.
+
+        return alert
+
+    @classmethod
+    def serialize(cls, alert: Alert) -> str:
+        return dumps(alert.__dict__)
+
+    @classmethod
+    def deserialize(cls, alert: str) -> Alert:
+        d = loads(alert)
+        ret = Alert()
+        for k in d:
+            setattr(ret, k, d[k])
+        return ret
 
     def _set(self, a: dict, d: dict):
         for f in d:

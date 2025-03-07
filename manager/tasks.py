@@ -12,10 +12,8 @@ async def handle_alert(alert: dict):
     mitigation, locates applicable workflows, and applies them.
     """
     try:
-
-        parsed_alert = Alert(alert)
-
-        # Step 1: update and retrieve local state
+        parsed_alert = Alert.from_wazuh(alert)
+        # Retrieve and update local state
         log.info('Updating local state')
         mitigatable_nodes = await state.update(parsed_alert)
 
