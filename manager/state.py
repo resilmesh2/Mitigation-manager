@@ -3,7 +3,6 @@ from __future__ import annotations
 from json import dumps, loads
 from typing import TYPE_CHECKING, LiteralString, TypeVar
 
-from manager import config
 from manager.config import InvalidEnvironmentError, log
 from manager.model import Attack, AttackNode, Condition, MitreTechnique, Workflow
 
@@ -527,7 +526,7 @@ class StateManager:
         return ret
 
 
-async def update(alert: Alert) -> tuple[set[AttackNode], set[AttackNode], set[AttackNode]]:
+async def update(alert: Alert) -> set[Attack]:
     """Update the local state with an alert.
 
     Return 3 lists of nodes that should be mitigated:
@@ -536,10 +535,6 @@ async def update(alert: Alert) -> tuple[set[AttackNode], set[AttackNode], set[At
     - Nodes further along in the active attack graphs.
     """
     state = await get_state_manager().retrieve_attacks()
-
-    past: set[AttackNode] = set()
-    present: set[AttackNode] = set()
-    future: set[AttackNode] = set()
 
     completed: list[Attack] = []
 
@@ -576,27 +571,4 @@ async def update(alert: Alert) -> tuple[set[AttackNode], set[AttackNode], set[At
     # Run all DB updates
     log.debug('Committing changes to DB')
     await get_state_manager().connection.commit()
-
-    log.debug('Final attack front: %s', [a.identifier for a in state])
-    log.info('Evaluating attack front')
-
-    # TODO: Move this elsewhere, and instead of mitigating by node
-    # mitigate by attack (run this check for all attacks, and use
-    # context to determine if they should be mitigated),
-    for attack in state:
-        # Past: judge based on risk history
-        for n in attack.attack_front.all_before():
-            if n.historically_risky():
-                log.debug('Node %s has been historically very risky, appending', n.identifier)
-                past.add(n)
-        # Present: only if it was related to this alert
-        if attack.attack_front.technique in alert.rule_mitre_ids:
-            log.debug('Node %s is directly impacted by the alert, appending', attack.attack_front.identifier)
-            present.add(attack.attack_front)
-        # Future: judge based on how likely it is
-        for n in attack.attack_front.all_after():
-            if n.probability > config.PROBABILITY_TRESHOLD:
-                log.debug('Node %s is very likely to occur in the future, appending', n.identifier)
-                future.add(n)
-
-    return (past, present, future)
+    return set(state)
