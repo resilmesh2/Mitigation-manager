@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import reduce
+from json import dumps, loads
 from math import fabs
 from types import SimpleNamespace
 from typing import LiteralString, get_args
@@ -358,6 +359,25 @@ class Attack:
         if node.identifier in self.context:
             return self.context[node.identifier]
         return None
+
+    def get_context_as_json(self) -> str:
+        """Return the attack's context as a JSON string."""
+        ret = {}
+        for k, v in self.context.items():
+            # All context entries that are just a number will always
+            # correspond to alerts.
+            if isinstance(k, int):
+                ret[k] = Alert.serialize(v)
+            else:
+                ret[k] = v
+        return dumps(ret)
+
+    def set_context_from_json(self, context: str):
+        for k, v in loads(context).items():
+            if k.isdigit():
+                self.context[int(k)] = Alert.deserialize(v)
+            else:
+                self.context[k] = v
 
     def __str__(self) -> str:
         return (f'Attack {self.identifier} '
