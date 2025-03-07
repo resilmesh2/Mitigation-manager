@@ -554,11 +554,6 @@ async def update(alert: Alert) -> tuple[set[AttackNode], set[AttackNode], set[At
             if attack.is_complete:
                 log.debug('Attack node %s was completed by the alert', attack.identifier)
                 completed.append(attack)
-            else:
-                assert attack.attack_front.prv is not None
-                log.debug('Advancing attack from node %s to %s',
-                          attack.attack_front.identifier,
-                          attack.attack_front.prv.identifier)
         else:
             log.debug('Attack node %s did not change state', attack.identifier)
 
