@@ -26,7 +26,6 @@ async def initialize_nats(app: Sanic):  # noqa: D103
         getenv('NATS_TOPIC'),
         cb=handle_message,
     )
-    log.info('Ready to mitigate')
 
 
 async def shutdown_nats(app: Sanic):  # noqa: D103
@@ -35,6 +34,7 @@ async def shutdown_nats(app: Sanic):  # noqa: D103
 
 
 def initialize_neo4j(app: Sanic):  # noqa: D103
+    log.debug('Connecting to ISIM')
     driver = AsyncGraphDatabase().driver(getenv('NEO4J_URL'),
                                          auth=(getenv('NEO4J_USERNAME'),
                                                getenv('NEO4J_PASSWORD')))
@@ -47,6 +47,7 @@ async def shutdown_neo4j(app: Sanic):  # noqa: D103
 
 
 async def initialize_sqlite(app: Sanic):  # noqa: D103
+    log.debug('Connecting to SQLite')
     app.ctx.sqlite_db = await aiosqlite.connect(getenv('SQLITE_DB_PATH'))
     app.ctx.sqlite_db.row_factory = aiosqlite.Row
     with Path('resources/init.sql').open() as f:
