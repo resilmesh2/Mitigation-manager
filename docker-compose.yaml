@@ -15,6 +15,7 @@ services:
     ports:
       - 8222:8222
       - 4222:4222
+    command: -js
     networks:
       resilmesh_network:
         ipv4_address: 192.168.200.11
