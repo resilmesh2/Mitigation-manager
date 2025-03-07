@@ -545,12 +545,14 @@ async def update(alert: Alert) -> tuple[set[AttackNode], set[AttackNode], set[At
 
     # 2: Advance state if necessary.
     log.info('Advancing attack front')
-    log.debug('Current attack front:  %s', [a.identifier for a in state])
+    log.debug('Current attack front:  %s', [str(a) for a in state])
     for attack in state:
+        log.debug('Checking if attack node %s is advanced by the alert', attack.identifier)
         if await attack.advanced_by(alert):
+            log.debug('Advancing attack node %s', attack.identifier)
             await get_state_manager().advance(attack, alert)
             if attack.is_complete:
-                log.debug('Attack %s was completed by the alert', attack.identifier)
+                log.debug('Attack node %s was completed by the alert', attack.identifier)
                 completed.append(attack)
             else:
                 assert attack.attack_front.prv is not None
@@ -558,15 +560,15 @@ async def update(alert: Alert) -> tuple[set[AttackNode], set[AttackNode], set[At
                           attack.attack_front.identifier,
                           attack.attack_front.prv.identifier)
         else:
-            log.debug('Attack %s did not change state', attack.identifier)
+            log.debug('Attack node %s did not change state', attack.identifier)
 
-    log.debug('Attack front after advancement: %s', [a.identifier for a in state])
+    log.debug('Attack front after advancement: %s', [str(a) for a in state])
 
     # 1: Add new attacks to state
     new_attack_graphs = await get_state_manager().retrieve_new_graphs(alert)
     for graph in new_attack_graphs:
         state.append(await get_state_manager().start_attack(graph))
-    log.debug('Started tracking %s new attacks', len(new_attack_graphs))
+    log.debug('Final attack front after new graphs: %s', [str(a) for a in state])
 
     # 3: Update probability percentages
     log.debug('Updating probabilities')
