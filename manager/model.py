@@ -9,6 +9,7 @@ import hy
 from aiohttp import ClientSession
 
 from manager import config
+from manager.config import log
 
 WorkflowUrl = str
 MitreTechnique = str
@@ -297,7 +298,7 @@ class AttackNode:
         old = self.probability
         new = (self._factor_1() + self._factor_2() + factor_3) / 3
         if fabs(old - new) < epsilon:
-            config.log.debug('Skipping probability update of node %s (no meaningful change)', self.identifier)
+            log.debug('Skipping probability update of node %s (no meaningful change)', self.identifier)
             return False
         self.probability_history.append(new)
         return True
@@ -425,12 +426,14 @@ class Workflow:
 
     async def execute(self, alert: Alert) -> bool:
         """Execute the workflow."""
-        config.log.debug('Executing workflow "%s"', self.name)
+        log.debug('Executing workflow "%s"', self.name)
         body = self.generate_request_json(alert)
         async with ClientSession() as client, client.post(self.url, json=body) as response:
             if response.status == 200:
                 self.results = await response.json()
                 self.executed = True
-            config.log.debug('Workflow request failed with status code %s', response.status)
-            config.log.debug(await response.text())
+            else:
+                log.debug('Workflow request failed with status code %s', response.status)
+                log.debug(await response.text())
+                self.executed = False
         return self.executed
