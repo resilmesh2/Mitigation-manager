@@ -562,7 +562,9 @@ async def update(alert: Alert) -> tuple[set[AttackNode], set[AttackNode], set[At
     # 1: Add new attacks to state
     new_attack_graphs = await get_state_manager().retrieve_new_graphs(alert)
     for graph in new_attack_graphs:
-        state.append(await get_state_manager().start_attack(graph))
+        new_attack = await get_state_manager().start_attack(graph)
+        await get_state_manager().advance(new_attack, alert)
+        state.append(new_attack)
     log.debug('Final attack front after new graphs: %s', [str(a) for a in state])
 
     # 3: Update probability percentages
