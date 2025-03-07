@@ -373,41 +373,75 @@ class StateManager:
         """Return a list of eligible new attack graphs.
 
         An attack graph is eligible if its initial node is triggered
-        by the given alert and the alert isn't being tracked already.
+        by the given alert and the alert isn't being tracked already
+        by an existing attack.
         """
         ret = []
         # Edge case: attackless alert
         if len(alert.techniques()) == 0:
             log.warning('Alert has no MITRE Techniques, no new attack graphs triggered')
             return ret
+
+        # Retrieve all attack graph identifiers that could potentially
+        # be matched.
+        potential_matches = []
         query_retrieve = """
-        SELECT an.identifier AS identifier
-        FROM AttackNodes AS an
-        INNER JOIN AttackGraphs AS ag ON an.identifier = ag.initial_node
+        SELECT ag.identifier AS identifier
+        FROM AttackGraphs AS ag
+        INNER JOIN AttackNodes AS an ON an.identifier = ag.initial_node
         """
-        query_retrieve += f'WHERE ({" OR ".join("an.technique LIKE ?" for _ in alert.rule_mitre_ids)})'
-        parameters_retrieve = (*[f'%{attack}%' for attack in alert.rule_mitre_ids],)
+        query_retrieve += f'WHERE ({" OR ".join("an.technique LIKE ?" for _ in alert.techniques())})'
+        parameters_retrieve = (*[f'%{attack}%' for attack in alert.techniques()],)
         async with self.connection.execute(query_retrieve, parameters_retrieve) as cursor:
             async for row in cursor:
-                if row['identifier'] is None:
-                    msg = 'Attack node with null identifier'
-                    raise InvalidDatabaseStateError(msg)
-                if not await self.already_tracked(alert, row['identifier']):
-                    node = await self.retrieve_node(row['identifier'])
-                    if node is None:
-                        msg = 'Missing initial node'
-                        raise InvalidDatabaseStateError(msg)
-                    node = await self.retrieve_full_graph(node)
-                    ret.append(node)
+                potential_matches.append(row['identifier'])
+
+        potential_matches_str = f'({", ".join([str(i) for i in potential_matches])})'
+        # For each attack graph, filter out those who aren't already
+        # tracked by attacks and immediately append them.  These
+        # queries trigger linter alerts due to potential SQL injection
+        # attacks, but since the data we're getting is all strictly
+        # coming from INT fields from the same database then there
+        # should be no injection potential unless the database itself
+        # is corrupted with invalid attack graph identifiers.
+        query_no_attacks = f"""
+        SELECT an.*
+        FROM AttackGraphs AS ag
+        LEFT JOIN Attacks AS a ON ag.identifier = a.attack_graph
+        INNER JOIN AttackNodes AS an ON ag.initial_node = an.identifier
+        WHERE a.identifier IS NULL
+        AND ag.identifier IN {potential_matches_str}
+        """  # noqa: S608
+        async with self.connection.execute(query_no_attacks) as cursor:
+            async for row in cursor:
+                node = await self._row_to_attack_node(row)
+                graph = await self.retrieve_full_graph(node)
+                log.debug('Graph %s has no attacks ongoing, adding', graph.identifier)
+                ret.append(graph)
+
+        # For graphs with existing attacks, add them only if none of
+        # those attacks are tracking the alert.
+        query_with_attacks = f"""
+        SELECT a.*
+        FROM Attacks AS a
+        WHERE a.attack_graph IN {potential_matches_str}
+        """  # noqa: S608
+        async with self.connection.execute(query_with_attacks) as cursor:
+            async for row in cursor:
+                attack = await self._row_to_attack(row)
+                if not await self.already_tracked(alert, attack):
+                    log.debug('Graph %s has no attacks matching the alert, adding', attack.attack_graph.identifier)
+                    ret.append(attack.attack_graph)
         return ret
 
     async def already_tracked(self, alert: Alert, attack: Attack) -> bool:
-        """Check if an alert is already mapped to an attack.
-
-        The attack node's identifier is available for checks.
-        """
-        # TODO: Perhaps store some unique alert field as context in
-        #       the Attack table.
+        """Check if an alert is already mapped to an attack."""
+        # For now, we will check if the alert is a duplicate of any of
+        # the alerts stored inside the attack.
+        for n in attack.attack_graph.all():
+            stored_alert = attack.retrieve_alert(n)
+            if stored_alert is not None and alert == stored_alert:
+                return True
         return False
 
     async def start_attack(self, node: AttackNode) -> Attack:
@@ -440,7 +474,7 @@ class StateManager:
         if identifier is None:
             msg = 'INSERT operation did not result in a row ID'
             raise InvalidDatabaseStateError(msg)
-        return Attack(identifier, node, {})
+        return Attack(identifier, node.first(), {})
 
     async def advance(self, attack: Attack, alert: Alert):
         """Advance an attack."""
@@ -453,15 +487,14 @@ class StateManager:
             SET attack_front = ?, context = ?
             WHERE identifier = ?
             """
-            parameters = (attack_front, attack.context, attack.identifier)
+            parameters = (attack_front.identifier, attack.get_context_as_json(), attack.identifier)
             await self.connection.execute(query, parameters)
-            attack.attack_front = attack_front
         else:
             query = """
             DELETE FROM Attacks
             WHERE identifier = ?
             """
-            parameters = (attack.identifier)
+            parameters = (attack.identifier,)
             await self.connection.execute(query, parameters)
             attack.is_complete = True
 
