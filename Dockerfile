@@ -15,4 +15,6 @@ RUN pip install --no-cache-dir micropipenv && \
 
 COPY manager ./manager
 
+COPY resources ./resources
+
 ENTRYPOINT [ "sanic", "--host", "0.0.0.0", "manager.server:manager" ]
