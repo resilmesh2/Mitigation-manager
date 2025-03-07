@@ -7,6 +7,15 @@ services:
     ports:
       - 8333:8000
     command: --debug
+    environment:
+      - SANIC_NATS_URL=nats://nats:4222
+      - SANIC_NATS_TOPIC=alerts
+      - SANIC_SHUFFLE_HOST=localhost
+      - SANIC_SHUFFLE_PORT=3001
+      - SANIC_NEO4J_URL=neo4j://neo4j:7n687
+      - SANIC_NEO4J_USERNAME=neo4j
+      - SANIC_NEO4J_PASSWORD=supertestovaciheslo
+      - SANIC_SQLITE_DB_PATH=/production.sqlite3
     networks:
       resilmesh_network:
         ipv4_address: 192.168.200.12
