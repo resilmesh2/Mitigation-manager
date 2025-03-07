@@ -356,7 +356,7 @@ class Attack:
         or it hasn't been triggered yet.
         """
         if node.identifier in self.context:
-            return Alert(self.context[node.identifier])
+            return self.context[node.identifier]
         return None
 
     def __str__(self) -> str:
