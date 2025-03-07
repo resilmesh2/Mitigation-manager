@@ -288,16 +288,34 @@ class StateManager:
                 ret.append(await self._row_to_attack(row))
         return ret
 
-    async def retrieve_full_graph(self, initial_node: AttackNode) -> AttackNode:
+    async def retrieve_full_graph(self, initial_node: AttackNode, attack_identifier: int | None = None) -> AttackNode:
         """Return an initial node's complete attack graph.
 
-        The node returned is the ongoing node.  If none of the
-        subsequent nodes are the ongoing node, returns `initial_node`.
-        This function modifies `initial_node`'s `nxt` value.
+        When `attack_identifier` is not `None`, the node returned is
+        the initial node.  Otherwise, the node returned is the
+        attack's ongoing node.  This function modifies
+        `initial_node`'s `nxt` value if it is malformed.
         """
-        # Retrieve the next node in the attack graph
+        # Retrieve the attack front.  If no attack exists for the
+        # attack graph, the attack front is the initial node.
+        if attack_identifier is None:
+            attack_front = initial_node.identifier
+        else:
+            query_for_attack_front = """
+            SELECT attack_front
+            FROM Attacks
+            WHERE identifier = ?
+            """
+            async with self.connection.execute(query_for_attack_front, (attack_identifier,)) as cursor:
+                row = await cursor.fetchone()
+                if row is None:
+                    msg = f'Attack {attack_identifier} not found in the database'
+                    raise InvalidDatabaseStateError
+                attack_front = row['attack_front']
+
+        # Because we don't have initial_node.nxt, we need to query the
+        # database to know if it even exists.
         final_node = initial_node
-        ret = None
         query_for_first_nxt = """
         SELECT nxt
         FROM AttackNodes
@@ -306,33 +324,19 @@ class StateManager:
         async with self.connection.execute(query_for_first_nxt, (initial_node.identifier,)) as cursor:
             row = await cursor.fetchone()
             if row is None:
-                return initial_node
-        nxt = row['nxt']
-
-        # Retrieve the attack front
-        query_for_attack_front = """
-        SELECT a.attack_front AS attack_front
-        FROM Attacks AS a
-        INNER JOIN AttackGraphs AS ag ON a.attack_graph = ag.identifier
-        WHERE ag.initial_node = ?
-        """
-        async with self.connection.execute(query_for_attack_front, (initial_node.identifier,)) as cursor:
-            row = await cursor.fetchone()
-            if row is None:
-                msg = 'Initial node does not belong to an attack graph'
+                msg = f'Attack node {initial_node.identifier} does not exist in the database'
                 raise InvalidDatabaseStateError(msg)
-            attack_front = row['attack_front']
-
-        if attack_front is None or attack_front == initial_node.identifier:
-            ret = initial_node
+            nxt = row['nxt']
 
         # Edge case: graphs of length 1
         if nxt is None:
-            # Set the initial node values just in case
+            # Setting the nxt value ensures that a potentially
+            # malformed parameter is fixed.
             initial_node.nxt = None
-            return attack_front
+            return initial_node
 
         # Retrieve the remainder of the attack graph
+        ret = initial_node if attack_front == initial_node.identifier else None
         query = """
         SELECT *
         FROM AttackNodes
@@ -341,7 +345,7 @@ class StateManager:
         while True:
             async with self.connection.execute(query, (nxt,)) as cursor:
                 if cursor.arraysize > 1:
-                    msg = 'Multiple next nodes for attack node'
+                    msg = f'Multiple next nodes for attack node {nxt}'
                     raise InvalidDatabaseStateError(msg)
                 row = await cursor.fetchone()
                 if row is None:
@@ -357,8 +361,11 @@ class StateManager:
                     ret = final_node
                 nxt = row['nxt']
                 if nxt is None:
-                    if ret is None:  # This should never happen
-                        msg = 'Attack front is neither None nor any of the nodes in the attack graph'
+                    # If the attack front hasn't been mapped to a node
+                    # yet, it must be an invalid node that's not in
+                    # the attack graph.
+                    if ret is None:
+                        msg = f'Attack front {attack_front} does not exist in any of the nodes in attack graph'
                         raise InvalidDatabaseStateError(msg)
                     return ret
 
