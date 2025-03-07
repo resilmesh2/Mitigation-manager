@@ -275,7 +275,7 @@ async def post_condition(request: Request) -> HTTPResponse:
                                                         condition['params'],
                                                         condition['args'],
                                                         condition['check']))
-
+    await get_state_manager().connection.commit()
     return empty(200)
 
 
@@ -410,6 +410,7 @@ async def post_node(request: Request) -> HTTPResponse:
                                                     [DummyCondition(c_id) for c_id in node['conditions']],
                                                     node['probabilities'],
                                                     node['description']))
+    await get_state_manager().connection.commit()
     return empty(200)
 
 
@@ -612,4 +613,5 @@ async def post_workflow(request: Request) -> HTTPResponse:
                                                       workflow['params'],
                                                       workflow['args'],
                                                       [DummyCondition(i) for i in workflow['conditions']]))
+    await get_state_manager().connection.commit()
     return empty(200)
