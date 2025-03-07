@@ -233,13 +233,48 @@ class StateManager:
 
     async def _row_to_attack(self, row: Row) -> Attack:
         identifier = int(row['identifier'])
-        attack_front = await self.retrieve_node(row['attack_front'])
-        if attack_front is None:
-            msg = 'Missing attack front node for attack'
+
+        # Retrieving the full attack graph requires knowing what the
+        # initial node is.
+        query = """
+        SELECT an.identifier AS identifier
+        FROM AttackNodes AS an
+        INNER JOIN AttackGraphs AS ag ON ag.initial_node = an.identifier
+        WHERE ag.identifier = ?
+        """
+        parameters = (row['attack_graph'],)
+        async with self.connection.execute(query, parameters) as cursor:
+            subrow = await cursor.fetchone()
+            if subrow is None:
+                msg = f'Initial node for attack graph {row["attack_graph"]} not found in the database'
+                raise InvalidDatabaseStateError(msg)
+            initial_node_identifier = subrow['identifier']
+            # I could have technically made the initial node with the
+            # previous query only, but I'd rather stick to the API I'm
+            # making for now.
+            initial_node = await self.retrieve_node(initial_node_identifier)
+            if initial_node is None:
+                msg = f'Node {initial_node_identifier} not found in the database'
+                raise InvalidDatabaseStateError(msg)
+        graph = await self.retrieve_full_graph(initial_node)
+
+        attack_front_identifier = row['attack_front']
+        attack_front = graph
+        while attack_front.nxt is not None and attack_front.identifier != attack_front_identifier:
+            attack_front = attack_front.nxt
+
+        # Since we check even the initial node, we must have found the
+        # attack front one way or the other.  Anything else is an
+        # invalid database state.  The way to check for this is to see
+        # if the identifiers are the same.
+        if attack_front.identifier != attack_front_identifier:
+            msg = f'Attack front {attack_front_identifier} not found in attack graph {graph.identifier}'
             raise InvalidDatabaseStateError(msg)
-        attack_front = await self.retrieve_full_graph(attack_front)
-        context = loads(row['context'])
-        return Attack(identifier, attack_front, context)
+
+        context = row['context']
+        ret = Attack(identifier, attack_front, {})
+        ret.set_context_from_json(context)
+        return ret
 
     async def retrieve_attacks(self) -> list[Attack]:
         """Return the list of current attacks."""
