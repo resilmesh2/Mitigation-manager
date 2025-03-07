@@ -170,7 +170,7 @@ class Condition:
         # Setup
         wrapper = """
         (require manager.conditions *)
-        (with-local-state {})
+        (prepare-function {})
         """
         return await hy.eval(hy.read_many(wrapper.format(self.check)))(self.parameters(_alert), _alert, log)
 
