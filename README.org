@@ -27,122 +27,6 @@ Mitigation Manager on the ResilMesh network.
 # corresponding to initial access will most likely come from other attacks and
 # thus require separate attack graphs to be built.
 
-* List of abbreviations
-
-- MM :: Mitigation Manager (component)
-- ISIM :: Infrastructure and Service Information Model (component)
-- MILP :: Mixed Integer Lineal Programming
-- CSA :: Cyber Situational Awareness
-
-* Theory
-
-In its most simple form the MM works by managing a local "domain state",
-updating it whenever an alert is received, and iterating through mitigation
-workflows to select the least costly one.  A more complete explanation includes
-the querying of the ISIM to update workflow costs in real time according to the
-current situation, the prediction of potential next alerts based on attacker
-behavior, and the optimized workflow-selection process by modeling the
-requirements as a MILP.
-
-** Domain state
-
-The MM keeps in memory a simplistic representation of the current state of the
-network.  The purpose of this state is to aid in prediction of an attacker's
-most likely next steps.
-
-*** Attack state
-
-The attack space contains a series of zero or more MITRE ATT&CK graphs,
-representing the current perceived attack state of the network.  When the MM
-receives alerts it maps them to potential attack graphs they might belong to,
-gaining more accuracy as more alerts are evaluated.  These attack graphs help
-the MM
-
-*** Tactic space
-
-The tactic space is a set of MITRE Tactics and a percentage assigned to each
-one, determined to be an attacker's most likely next step.  This space starts on
-a uniform distribution between Initial Access/C&C/Recon/Resource Development,
-and evolves over time based on the received alerts.  For example: given an alert
-associated with a TA0001 attack, the tactic space will then reduce the
-probabilities associated with C&C/Recon/Resource Development, drastically reduce
-the probability of Initial Access, and prioritize other tactics such as Lateral
-Movement.  The information offered by the tactic space is used to predict next
-alerts.
-
-** Workflows
-
-The MM maintains a collection of workflows that it can trigger at any moment to
-mitigate all sorts of attacks.  Each workflow requires a series of parameters
-(f.e. target device) which are computed using the current alert, CSA information
-from the ISIM, and the current domain state.  Workflows also include two cost
-values:
-
-- Set cost :: The cost of applying the workflow, regardless of current
-  conditions.
-
-- Variable cost :: The cost of applying a workflow, based on current conditions.
-  For example, disabling a service within a device will incur a cost
-  proportional in part to that service's importance to domain missions.
-  Variable cost is calculated using a series of predefined parameters computed
-  using the ISIM.
-
-Finally, workflows are additionally categorized by their type: either proactive
-(putting measures in place to avoid attacks) or reactive (responding to attacks
-by mitigating their effects).  For example: applying a vulnerability patch to a
-device is categorized as proactive (since this mitigation will only work if the
-vulnerability hasn't been exploited yet), while terminating a malicious process
-is categorized as reactive (the process has been executed already, but the harm
-it might cause can be mitigated by killing it).  The MM is tasked with two jobs:
-calculating the optimal reactive mitigation for a given alert, and preemptively
-applying proactive mitigations targeted at potential next alerts.
-
-** MILP
-
-Multi-objective optimization problems over attack graphs can be transformed into
-MILPs, which can then in turn be solved by MILP libraries with high efficiency.
-If in possession of the attack graph, a MILP can be utilized to calculate the
-optimal mitigation strategy that conforms to any existing cost constraints.  The
-MM will use MILPs to calculate proactive workflows, so long as the attack graph
-is either present or can be deduced using the domain state.
-
-** Risk score integration
-
-The MM receives as information a risk score, used as a representation of how
-much danger the network is currently inferred to be in.  High enough risk scores
-will cause the MM to enforce certain proactive workflows, regardless of the
-current domain state.  For example: if the risk score of a device is too high,
-the MM might attempt to patch known vulnerabilities or restrict network access
-in an attempt to reduce the risk score.  The MM will act based on current CSA,
-with risk score reducing efforts proportional to the "importance" of the
-affected region/s.  For example: if a device is critical for a business mission,
-the risk threshold before the MM starts addressing it will be lower than that of
-a device not critical for any business missions.
-
-* Design
-
-The MM is split into  components, each of which addresses one of the 4 main
-aspects of attack mitigation: maintaining an up-to-date local state, mitigating
-immediate alerts, mitigating attack graphs, and mitigating potential future
-techniques.
-
-** State Manager
-
-The State Manager (SM) is the section of the MM in charge of instanciating and
-maintaining a representation of the current attack state.  This representation
-consists of a series of MITRE ATT&CK graphs, represented using a set of doubly
-linked action nodes.
-
-When receiving an alert, the MM first requests an update of the local state.
-This update process advances any attack graph progress and recalculates attack
-node probabilities based on the alert being processed.  After this update, the
-SM then calculates a list of attack nodes that should be mitigated.  The nodes
-in this list are not only directly related to the received alert, but also those
-that have been considered as very likely to happen in the near future, as well
-as nodes that have a history of being very likely to be exploited.  This list of
-nodes, thus, contains an overview of the actions that should be taken to
-mitigate any current threats and return the network into a lower state of risk.
-
 * Deployment
 
 The Mitigation Manager is packaged inside a Docker image and deployed using
@@ -151,28 +35,29 @@ Docker Compose.
 ** Creating the ResilMesh network
 
 All ResilMesh containers run on a special network called =resilmesh_network=.
-This network should be created in advance with the ~docker network create~
-command.  There are several static IPs in use by the project that are dependent
-on the ResilMesh network, so please ensure that the subnet they belong to
-matches the one used by the network.  The default configuration assumes the
-subnet =192.168.200.0/24=.  A network using this subnet can be created using the
-following command.
+This network should be created in advance with the following command:
 
 #+NAME: mitigation-manager-create-network
 #+begin_src sh
-  docker network create --subnet 192.168.200.0/24 --gateway=192.168.200.1 resilmesh_network
+  docker network create resilmesh_network
 #+end_src
+
+** Setting environment variables
+
+The project includes an =.env.example= file with information regarding the
+available environment variables.  Make a copy of the file, rename it to =.env=,
+and fill/modify any necessary values.
 
 ** Launching the Mitigation Manager
 
 #+NAME: mitigation-manager-run
 #+begin_src sh
-  docker compose up --build -d
+  docker compose --env-file .env up --build -d
 #+end_src
 
 #+NAME: mitigation-manager-stop
 #+begin_src sh
-  docker compose down --remove-orphans
+  docker compose --env-file .env down --remove-orphans
 #+end_src
 
 * COMMENT Babel

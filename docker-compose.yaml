@@ -2,28 +2,19 @@ services:
   mitigation-manager:
     build:
       context: .
-    container_name: ResilMesh-Mitigation_Manager
+    container_name: ${MANAGER_CONTAINER_NAME}
     depends_on:
       - nats
     ports:
-      - 8333:8000
+      - ${MANAGER_PORT}:8000
     command: --debug
     environment:
-      - SANIC_NATS_URL=nats://nats:4222
-      - SANIC_NATS_TOPIC=alerts
-      - SANIC_NEO4J_URL=neo4j://neo4j:7n687
-      - SANIC_NEO4J_USERNAME=neo4j
-      - SANIC_NEO4J_PASSWORD=supertestovaciheslo
+      - SANIC_NATS_URL=${NATS_URL}
+      - SANIC_NATS_TOPIC=${NATS_TOPIC}
+      - SANIC_NEO4J_URL=${NEO4J_URL}
+      - SANIC_NEO4J_USERNAME=${NEO4J_USERNAME}
+      - SANIC_NEO4J_PASSWORD=${NEO4J_PASSWORD}
       - SANIC_SQLITE_DB_PATH=/production.sqlite3
-    networks:
-      resilmesh_network:
-  nats:
-    image: nats:latest
-    container_name: ResilMesh-NATS
-    ports:
-      - 8222:8222
-      - 4222:4222
-    command: -js
     networks:
       resilmesh_network:
 networks:
