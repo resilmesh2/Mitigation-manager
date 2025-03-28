@@ -48,10 +48,12 @@ Resilmesh GitHub upload:
   tags:
     - docker
   before_script:
+    - set -x
     - git config --global user.email "${GITHUB_EMAIL}"
     - git config --global user.name "${GITHUB_USERNAME}"
-    - git remote add github "https://oauth2:${GITHUB_TOKEN}@github.com/resilmesh2/Mitigation-manager.git"
+    - git remote add github "https://oauth2:${GITHUB_TOKEN}@igthub.com/resilmesh2/Mitigation-manager.git"
   script:
+    - set -x
     - echo "Pushing 'release' branch to Resilmesh 'master' branch..."
     - git fetch origin release
     - git push github refs/remotes/origin/release:refs/heads/master
