@@ -12,7 +12,7 @@ from manager.config import getenv, log, set_config
 from manager.tasks import handle_alert
 
 
-async def initialize_nats(app: Sanic):  # noqa: D103
+async def initialize_nats(app: Sanic):
     async def handle_message(msg: Msg):  # noqa: RUF029
         alert = loads(msg.data.decode())
         log.info('New incoming alert')
@@ -28,12 +28,12 @@ async def initialize_nats(app: Sanic):  # noqa: D103
     )
 
 
-async def shutdown_nats(app: Sanic):  # noqa: D103
+async def shutdown_nats(app: Sanic):
     await app.ctx.nats_subscription.unsubscribe()
     await app.ctx.nats_connection.drain()
 
 
-def initialize_neo4j(app: Sanic):  # noqa: D103
+def initialize_neo4j(app: Sanic):
     log.debug('Connecting to ISIM')
     driver = AsyncGraphDatabase().driver(getenv('NEO4J_URL'),
                                          auth=(getenv('NEO4J_USERNAME'),
@@ -42,11 +42,11 @@ def initialize_neo4j(app: Sanic):  # noqa: D103
     isim.set_isim_manager(driver)
 
 
-async def shutdown_neo4j(app: Sanic):  # noqa: D103
+async def shutdown_neo4j(app: Sanic):
     await app.ctx.neo4j_driver.close()
 
 
-async def initialize_sqlite(app: Sanic):  # noqa: D103
+async def initialize_sqlite(app: Sanic):
     log.debug('Connecting to SQLite')
     app.ctx.sqlite_db = await aiosqlite.connect(getenv('SQLITE_DB_PATH'))
     app.ctx.sqlite_db.row_factory = aiosqlite.Row
@@ -59,11 +59,11 @@ async def initialize_sqlite(app: Sanic):  # noqa: D103
     state.set_state_manager(state.StateManager(app.ctx.sqlite_db))
 
 
-async def shutdown_sqlite(app: Sanic):  # noqa: D103
+async def shutdown_sqlite(app: Sanic):
     await app.ctx.sqlite_db.close()
 
 
-def manager() -> Sanic:  # noqa: D103
+def manager() -> Sanic:
     app = Sanic('Manager')
     bp_main = Blueprint.group(bg_manager, url_prefix='/api')
     app.blueprint(bp_main)

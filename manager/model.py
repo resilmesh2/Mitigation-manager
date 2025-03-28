@@ -33,6 +33,7 @@ class Alert(SimpleNamespace):
         'syscheck': {
             'sha1_after': 'file_hash',
             'path': 'file_path',
+            'perm_after': 'file_permissions',
         },
         'agent': {
             'id': 'agent_id',
@@ -53,8 +54,8 @@ class Alert(SimpleNamespace):
     @classmethod
     def from_wazuh(cls, wazuh_alert: dict) -> Alert:
         alert = Alert()
-        alert._set(wazuh_alert, alert.TRANSLATIONS)  # noqa: SLF001
-        alert._validate()  # noqa: SLF001
+        alert._set(wazuh_alert, alert.TRANSLATIONS)
+        alert._validate()
 
         # In the future it might be a good idea to store the entire
         # original alert as well.
@@ -172,7 +173,10 @@ class Condition:
         (require manager.conditions *)
         (prepare-function {})
         """
-        return await hy.eval(hy.read_many(wrapper.format(self.check)))(self.parameters(_alert), _alert, log)
+
+        func = hy.eval(hy.read_many(wrapper.format(self.check)))
+
+        return await func(self.parameters(_alert), _alert, log)
 
     def _contains_isim_query(self) -> str | None:
         if '#query' not in self.params:
@@ -257,7 +261,14 @@ class AttackNode:
 
     async def is_triggered(self, alert: Alert) -> bool:
         """Check whether the alert triggers the current node."""
-        return alert.triggers(self) and all([await c.is_met(alert) for c in self.conditions])
+        if not alert.triggers(self):
+            return False
+        for c in self.conditions:
+            if not await c.is_met(alert):
+                log.info('Condition not met: %s', c.name)
+                return False
+            log.debug('Condition met: %s', c.name)
+        return True
 
     def _factor_1(self, graph_interest: float = config.GRAPH_INTEREST) -> float:
         """Return the first factor used in calculating probability.
@@ -378,6 +389,7 @@ class Attack:
                 self.context[k] = v
 
     def __str__(self) -> str:
+        """Return a debug-friendly representation of the Attack."""
         return (f'Attack {self.identifier} '
                 f'on graph {self.attack_graph.identifier} '
                 f'node {self.attack_front.identifier}')
