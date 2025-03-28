@@ -46,6 +46,8 @@ Resilmesh GitHub upload:
   stage: deploy
   image:
     name: alpine/git:latest
+  tags:
+    - docker
   before_script:
     # ... (SSH setup if needed, git config) ...
     - git remote add github "https://oauth2:${GITHUB_TOKEN}@github.com/resilmesh2/Mitigation-manager.git" # Or SSH URL
@@ -58,7 +60,7 @@ Resilmesh GitHub upload:
     - git push --force github refs/remotes/origin/release:refs/heads/master
   rules:
     # Only run this job for pushes to the 'release' branch in GitLab
-    - if: '$CI_COMMIT_BRANCH == "release"'
+    - if: $CI_COMMIT_BRANCH == "release"
       when: on_success
 
 include:
