@@ -48,17 +48,14 @@ Resilmesh GitHub upload:
   tags:
     - docker
   before_script:
-    # ... (SSH setup if needed, git config) ...
-    - git remote add github "https://oauth2:${GITHUB_TOKEN}@github.com/resilmesh2/Mitigation-manager.git" # Or SSH URL
+    - git config --global user.email "${GITHUB_EMAIL}"
+    - git config --global user.name "${GITHUB_USERNAME}"
+    - git remote add github "https://oauth2:${GITHUB_TOKEN}@github.com/resilmesh2/Mitigation-manager.git"
   script:
     - echo "Pushing 'release' branch to Resilmesh 'master' branch..."
-    - git fetch origin release # Ensure we have the latest release branch locally in the runner
-    # The key part: push local 'origin/release' to remote 'master'
-    # - git push github refs/remotes/origin/release:refs/heads/master
-    # Add --force if you need GitLab to overwrite GitHub's master history. Use with caution!
-    - git push --force github refs/remotes/origin/release:refs/heads/master
+    - git fetch origin release
+    - git push github refs/remotes/origin/release:refs/heads/master
   rules:
-    # Only run this job for pushes to the 'release' branch in GitLab
     - if: $CI_COMMIT_BRANCH == "release"
       when: on_success
 
