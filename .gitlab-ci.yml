@@ -58,7 +58,7 @@ Resilmesh GitHub upload:
   script:
     - echo "Pushing 'release' branch to Resilmesh 'master' branch..."
     - git fetch origin release
-    - git push --force github refs/remotes/origin/release:refs/heads/master
+    - git push --force github refs/remotes/origin/release:refs/heads/main
   rules:
     - if: $CI_COMMIT_BRANCH == "release"
       when: on_success
