@@ -51,38 +51,58 @@ VALUES (100,
        100);
 
 INSERT OR IGNORE INTO AttackNodes
-(identifier, prv, nxt, technique, description, conditions)
+(identifier, prv, nxt, technique, description)
 VALUES (100,
        NULL,
        101,
        'T1041',
-       'Someone randomly connects using ncat',
-       '100');
+       'Someone randomly connects using ncat');
 
 INSERT OR IGNORE INTO AttackNodes
-(identifier, prv, nxt, technique, description)
+(identifier, prv, nxt, technique, description, conditions)
 VALUES (101,
        100,
        102,
        'T1222.002',
-       'Someone decides to adds +x to a Python script');
+       'Someone decides to adds +x to a Python script',
+       '100 101');
 
 INSERT OR IGNORE INTO AttackNodes
-(identifier, prv, nxt, technique, description)
+(identifier, prv, nxt, technique, description, conditions)
 VALUES (102,
        101,
        NULL,
        'T1204.002',
-       'Someone downloads a known ransomware script using the previous Python script, and the rest is history');
+       'Someone downloads a known Python ransomware script using the previous Python script, and the rest is history',
+       '100 102');
 
+-- Some conditions are defined in order to filter out unwanted alerts.
 INSERT OR IGNORE INTO Conditions
 (identifier, condition_name, condition_description, params, args, checkstring)
 VALUES (100,
-       'Alert condition met',
-       'The alert contains a field indicating that a condition has been met',
-       '{"condition_met": "Always true"}',
+       'File is a Python script',
+       'The file triggering the alert ends in ".py"',
        '{}',
-       '(in "condition_met" parameters)');
+       '{"path": "file_path"}',
+       '(and (is-not None parameters) ((. (get parameters "path") endswith) ".py"))');
+
+INSERT OR IGNORE INTO Conditions
+(identifier, condition_name, condition_description, params, args, checkstring)
+VALUES (101,
+       'File is executable',
+       'The file triggering the alert has executable permissions',
+       '{}',
+       '{"permissions": "file_permissions"}',
+       '(and (is-not None parameters) (in "x" (get parameters "permissions")))');
+
+INSERT OR IGNORE INTO Conditions
+(identifier, condition_name, condition_description, params, args, checkstring)
+VALUES (102,
+       'File is ransomware',
+       'The file triggering the alert is ransomware.',
+       '{}',
+       '{"path": "file_path"}',
+       '(and (is-not None parameters) (in "zerologon" (get parameters "path")))');
 
 -- Example workflows: close ncat connection, delete file, handle ransomware.
 INSERT OR IGNORE INTO Workflows
@@ -90,7 +110,7 @@ INSERT OR IGNORE INTO Workflows
 VALUES (100,
        'delete_file',
        'Deletes a file',
-       'http://localhost:3001/api/v1/hooks/webhook_6b219a4d-9723-4607-b6c6-6e56f790650c',
+       'http://shuffle-frontend/api/v1/hooks/webhook_6b219a4d-9723-4607-b6c6-6e56f790650c',
        'T1222.002',
        1,
        '{"sha1_after": "file_hash","file_path":"file_path","actuator_ip":"agent_ip","agent_id":"agent_id"}');
@@ -100,7 +120,7 @@ INSERT OR IGNORE INTO Workflows
 VALUES (101,
        'close_conn',
        'Closes a remote connection.',
-       'http://localhost:3001/api/v1/hooks/webhook_aa2e31ea-dd3e-4471-ad4e-3f032bdb381d',
+       'http://shuffle-frontend/api/v1/hooks/webhook_aa2e31ea-dd3e-4471-ad4e-3f032bdb381d',
        'T1041 T1219',
        10,
        '{"actuator_ip":"agent_ip","src_port":"connection_src_port","dst_port":"connection_dst_port","dst_ip":"connection_dst_ip","pid":"connection_pid","agent_id":"agent_id"}');
@@ -111,7 +131,7 @@ INSERT OR IGNORE INTO Workflows
 VALUES (103,
        'handle_ransomware',
        'Mitigate a ransomware attack',
-       'http://localhost:3001/api/v1/hooks/webhook_1d5366eb-8006-45a3-8fff-e764c283b811',
+       'http://shuffle-frontend/api/v1/hooks/webhook_1d5366eb-8006-45a3-8fff-e764c283b811',
        'T1204.002',
        5,
        '{"sha1_after": "file_hash","file_path":"file_path","actuator_ip":"agent_ip","agent_id":"agent_id"}');

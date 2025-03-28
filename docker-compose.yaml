@@ -2,6 +2,7 @@ services:
   mitigation-manager:
     build:
       context: .
+    container_name: ResilMesh-Mitigation_Manager
     depends_on:
       - nats
     ports:
@@ -10,24 +11,21 @@ services:
     environment:
       - SANIC_NATS_URL=nats://nats:4222
       - SANIC_NATS_TOPIC=alerts
-      - SANIC_SHUFFLE_HOST=localhost
-      - SANIC_SHUFFLE_PORT=3001
       - SANIC_NEO4J_URL=neo4j://neo4j:7n687
       - SANIC_NEO4J_USERNAME=neo4j
       - SANIC_NEO4J_PASSWORD=supertestovaciheslo
       - SANIC_SQLITE_DB_PATH=/production.sqlite3
     networks:
       resilmesh_network:
-        ipv4_address: 192.168.200.12
   nats:
     image: nats:latest
+    container_name: ResilMesh-NATS
     ports:
       - 8222:8222
       - 4222:4222
     command: -js
     networks:
       resilmesh_network:
-        ipv4_address: 192.168.200.11
 networks:
   resilmesh_network:
     external: true

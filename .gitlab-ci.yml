@@ -1,0 +1,76 @@
+stages:
+  - lint
+  - test
+  - deploy
+
+Ruff:
+  extends: .ruff
+  script:
+    # Ignoring the following:
+    #
+    # - D102,D103: Docstrings can be added in later merge requests.
+    - ruff check --output-format=gitlab manager --ignore D102,D103 > code-quality-report.json
+  artifacts:
+    reports:
+      codequality: $CI_PROJECT_DIR/code-quality-report.json
+
+Ruff (Test):
+  extends: .ruff
+  script:
+    # Ignoring the following:
+    #
+    # - D102,D103: There's no real need for docstrings in tests.
+    - ruff check --output-format=gitlab test --ignore D102,D103 > test-quality-report.json
+  artifacts:
+    reports:
+      codequality: $CI_PROJECT_DIR/test-quality-report.json
+
+sast:
+  stage: test
+
+Unit tests:
+  stage: test
+  image:
+    name: python:3.11
+  tags:
+    - docker
+  before_script:
+    - pip3 install --no-cache-dir micropipenv
+    - micropipenv requirements > requirements.txt
+    - pip3 install --no-cache-dir -r requirements.txt
+    - pip3 uninstall -y micropipenv
+  script:
+    - pytest test
+
+Resilmesh GitHub upload:
+  stage: deploy
+  image:
+    name: alpine/git:latest
+  before_script:
+    # ... (SSH setup if needed, git config) ...
+    - git remote add github "https://oauth2:${GITHUB_TOKEN}@github.com/resilmesh2/Mitigation-manager.git" # Or SSH URL
+  script:
+    - echo "Pushing 'release' branch to Resilmesh 'master' branch..."
+    - git fetch origin release # Ensure we have the latest release branch locally in the runner
+    # The key part: push local 'origin/release' to remote 'master'
+    # - git push github refs/remotes/origin/release:refs/heads/master
+    # Add --force if you need GitLab to overwrite GitHub's master history. Use with caution!
+    - git push --force github refs/remotes/origin/release:refs/heads/master
+  rules:
+    # Only run this job for pushes to the 'release' branch in GitLab
+    - if: '$CI_COMMIT_BRANCH == "release"'
+      when: on_success
+
+include:
+  - template: Security/SAST.gitlab-ci.yml
+
+.ruff:
+  stage: lint
+  interruptible: true
+  image:
+    name: ghcr.io/astral-sh/ruff:0.11.2-alpine
+  tags:
+    - docker
+  before_script:
+    - cd $CI_PROJECT_DIR
+    - ruff --version

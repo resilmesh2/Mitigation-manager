@@ -1,11 +1,13 @@
 from manager import config
 from manager.model import AttackNode
 
+# ruff: noqa: SLF001
+
 
 def test_attack_graph_creation():
-    node = AttackNode(123, 'T0000', [], [])\
-        .then(456, 'T0001', [], [])\
-        .then(789, 'T0002', [], [])\
+    node = AttackNode(123, 'T0000', [], [], '')\
+        .then(456, 'T0001', [], [], '')\
+        .then(789, 'T0002', [], [], '')\
         .last()
 
     assert node.identifier == 789
@@ -21,9 +23,9 @@ def test_attack_graph_creation():
     assert node.identifier == 123
     assert node.technique == 'T0000'
 
-    node = AttackNode(123, 'T0004', [], [])\
-        .then(456, 'T0005', [], [])\
-        .then(789, 'T0006', [], [])\
+    node = AttackNode(123, 'T0004', [], [], '')\
+        .then(456, 'T0005', [], [], '')\
+        .then(789, 'T0006', [], [], '')\
         .first()
 
     assert node.identifier == 123
@@ -41,9 +43,9 @@ def test_attack_graph_creation():
 
 
 def test_attack_graph_linkage():
-    node = AttackNode(123, 'T0000', [], [])\
-        .then(456, 'T0001', [], [])\
-        .then(789, 'T0002', [], [])\
+    node = AttackNode(123, 'T0000', [], [], '')\
+        .then(456, 'T0001', [], [], '')\
+        .then(789, 'T0002', [], [], '')\
         .first()
     cur = node.nxt
     prev = node
@@ -55,10 +57,11 @@ def test_attack_graph_linkage():
         cur = cur.nxt
     assert prev.nxt is None
 
+
 def test_attack_graph_sets():
-    node = AttackNode(123, 'First', [], [])\
-        .then(456, 'Second', [], [])\
-        .then(789, 'Third', [], [])\
+    node = AttackNode(123, 'First', [], [], '')\
+        .then(456, 'Second', [], [], '')\
+        .then(789, 'Third', [], [], '')\
         .first()
     assert len(node.all_before()) == 0
     assert len(node.all_after()) == 2
@@ -73,9 +76,9 @@ def test_attack_graph_sets():
 
 
 def test_factor_1():
-    node = AttackNode(123, 'T0001', [], [])\
-        .then(456, 'T0002', [], [])\
-        .then(789, 'T0003', [], [])\
+    node = AttackNode(123, 'T0001', [], [], '')\
+        .then(456, 'T0002', [], [], '')\
+        .then(789, 'T0003', [], [], '')\
         .first()
 
     prev = node._factor_1()
@@ -96,9 +99,9 @@ def test_factor_1():
 
 
 def test_factor_2():
-    node = AttackNode(123, 'T0003', [], [])\
-        .then(456, 'T0002', [], [])\
-        .then(789, 'T0001', [], [])\
+    node = AttackNode(123, 'T0003', [], [], '')\
+        .then(456, 'T0002', [], [], '')\
+        .then(789, 'T0001', [], [], '')\
         .first()
     assert type(node) is AttackNode
 
@@ -114,5 +117,5 @@ def test_factor_2():
     assert node._factor_2() <= f2, 'Second factor was higher with a shorter attack graph'
 
     # If the graph is bigger, factor 2 will always be equal or bigger.
-    node.last().nxt = AttackNode(123, 'T9998', [], []).then(456, 'T9999', [], []).first()
+    node.last().nxt = AttackNode(123, 'T9998', [], [], '').then(456, 'T9999', [], [], '').first()
     assert node._factor_2() >= f2, 'Second factor was lower with a longer attack graph'
