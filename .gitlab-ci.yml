@@ -44,8 +44,7 @@ Unit tests:
 
 Resilmesh GitHub upload:
   stage: deploy
-  image:
-    name: alpine/git:latest
+  image: alpine/git:latest
   tags:
     - docker
   before_script:
