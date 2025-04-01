@@ -3,8 +3,6 @@ services:
     build:
       context: .
     container_name: ${MANAGER_CONTAINER_NAME}
-    depends_on:
-      - nats
     ports:
       - ${MANAGER_PORT}:8000
     command: --debug
