@@ -279,7 +279,7 @@ class AttackNode:
         follows a quadratic curve.
         """
         exp = (1 - graph_interest) * 4 + 1
-        return (len(self.all_before()) / (len(self.all_before()) + len(self.all_after()))) ** exp
+        return (len(self.all_before()) / (len(self.all_before()) + 1 + len(self.all_after()))) ** exp
 
     def _factor_2(self,
                   max_conditions: int = config.MAX_CONDITIONS,
