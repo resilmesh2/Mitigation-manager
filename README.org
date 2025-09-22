@@ -255,20 +255,92 @@ following special fields:
   }
 #+end_src
 
-* COMMENT Babel
+** Flow Processor alert
 
-** Variables
-
-#+NAME: mitigation-manager-port
-: 8333
-
-#+NAME: example-dummy-alert
+#+NAME: example-rule-100100
 #+begin_src json-ts
   {
-    "timestamp": "2024-10-22T09:31:15.007+0000",
+    "input": {
+      "type": "log"
+    },
+    "agent": {
+      "name": "wazuh.manager",
+      "id": "000"
+    },
+    "manager": {
+      "name": "wazuh.manager"
+    },
+    "data": {
+      "attack_flow_alert": {
+        "multi_class_accuracy": "0.998451",
+        "datetime": "2025-09-08 11:43:33.943443",
+        "destination_ip": "10.185.2.97",
+        "destination_port": "3306",
+        "attack_type": "Slowloris",
+        "source_port": "54026",
+        "confidence": "0.999998",
+        "flow_features": {
+          "max_ttl_dl": "64",
+          "numbytes_ul": "1682",
+          "avg_iat_ul": "47.388889",
+          "min_ttl_dl": "63",
+          "numpackets_1s_dl": "10014.306152",
+          "stddev_iat_dl": "92.854313",
+          "numpackets_dl": "14",
+          "numbytes_dl": "2522",
+          "min_ttl_ul": "63",
+          "flow_duration": "0.001398",
+          "numpackets_1s_ul": "12875.536481",
+          "min_iat_dl": "0",
+          "min_packetsize_dl": "66",
+          "stddev_packetsize_dl": "232.712839",
+          "numpackets_ul": "18",
+          "avg_packetsize_ul": "93.444444",
+          "numpackets_ratio": "0",
+          "bits_1s_dl": "1804005.722461",
+          "min_iat_ul": "0",
+          "avg_ttl_dl": "63.500000",
+          "stddev_packetsize_ul": "57.412951",
+          "stddev_ttl_dl": "0.500000",
+          "min_packetsize_ul": "66",
+          "avg_packetsize_dl": "180.142857",
+          "max_iat_dl": "0",
+          "max_packetsize_dl": "745",
+          "max_ttl_ul": "64",
+          "stddev_iat_ul": "78.013630",
+          "bits_1s_ul": "1203147.353362",
+          "stddev_ttl_ul": "0.500000",
+          "avg_ttl_ul": "63.500000",
+          "avg_iat_dl": "38.928571",
+          "max_packetsize_ul": "250",
+          "max_iat_ul": "286"
+        },
+        "source_ip": "127.0.0.1"
+      }
+    },
     "rule": {
-      "#condition": true
-    }
+      "firedtimes": 10,
+      "mail": true,
+      "level": 12,
+      "description": "Attack Flow Detected: Slowloris from 10.185.2.97 to 127.0.0.1.",
+      "groups": [
+        "attack_flow"
+      ],
+      "id": "100100",
+      "mitre": {
+        "id": [
+          "T1110",
+          "T1499"
+        ]
+      }
+    },
+    "location": "API-Webhook",
+    "decoder": {
+      "name": "json"
+    },
+    "id": "1757331811.18627989",
+    "full_log": "{\"attack_flow_alert\": {\"datetime\": \"2025-09-08 11:43:33.943443\", \"source_ip\": \"10.185.2.97\", \"source_port\": 54026, \"destination_ip\": \"127.0.0.1\", \"destination_port\": 3306, \"multi_class_accuracy\": 0.998450765321931, \"attack_type\": \"Slowloris\", \"confidence\": 0.9999980926513672, \"flow_features\": {\"flow_duration\": 0.001398, \"numpackets_ul\": 18, \"numpackets_dl\": 14, \"numpackets_ratio\": 0, \"numpackets_1s_ul\": 12875.536480686695, \"numpackets_1s_dl\": 10014.306151645207, \"numbytes_ul\": 1682, \"numbytes_dl\": 2522, \"bits_1s_ul\": 1203147.3533619456, \"bits_1s_dl\": 1804005.722460658, \"max_packetsize_ul\": 250, \"max_packetsize_dl\": 745, \"min_packetsize_ul\": 66, \"min_packetsize_dl\": 66, \"avg_packetsize_ul\": 93.44444444444443, \"avg_packetsize_dl\": 180.14285714285717, \"stddev_packetsize_ul\": 57.412950747895266, \"stddev_packetsize_dl\": 232.71283872215227, \"max_ttl_ul\": 64, \"max_ttl_dl\": 64, \"min_ttl_ul\": 63, \"min_ttl_dl\": 63, \"avg_ttl_ul\": 63.5, \"avg_ttl_dl\": 63.5, \"stddev_ttl_ul\": 0.5, \"stddev_ttl_dl\": 0.5, \"max_iat_ul\": 286, \"max_iat_dl\": 0, \"min_iat_ul\": 0, \"min_iat_dl\": 0, \"avg_iat_ul\": 47.388888888888886, \"avg_iat_dl\": 38.92857142857143, \"stddev_iat_ul\": 78.01363049627851, \"stddev_iat_dl\": 92.85431314369707}}}",
+    "timestamp": "2025-09-08T11:43:31.955+0000"
   }
 #+end_src
 
@@ -307,6 +379,23 @@ following special fields:
       "b": "alert.b"
     }
   }
+#+end_src
+
+* COMMENT Babel
+
+** Variables
+
+#+NAME: mitigation-manager-port
+: 8333
+
+#+NAME: example-dummy-alert
+#+begin_src json-ts
+  {
+    "timestamp": "2024-10-22T09:31:15.007+0000",
+    "rule": {
+      "#condition": true
+    }
+
 #+end_src
 
 ** Code blocks
@@ -374,4 +463,12 @@ following special fields:
   Content-Type: application/json
 
   {{(org-sbe example-rule-100004)}}
+#+end_src
+
+#+NAME: mitigation-manager-handle-flow-processor-alert
+#+begin_src verb :wrap src ob-verb-response
+  POST http://localhost:{{(org-sbe mitigation-manager-port)}}/api/alert
+  Content-Type: application/json
+
+  {{(org-sbe example-rule-100100)}}
 #+end_src
