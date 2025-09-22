@@ -344,6 +344,25 @@ following special fields:
   }
 #+end_src
 
+* COMMENT Babel
+
+** Variables
+
+#+NAME: mitigation-manager-port
+: 8333
+
+#+NAME: example-dummy-alert
+#+begin_src json-ts
+  {
+    "timestamp": "2024-10-22T09:31:15.007+0000",
+    "rule": {
+      "#condition": true
+    }
+
+#+end_src
+
+
+
 #+NAME: example-condition
 #+begin_src json-ts
   {
@@ -379,23 +398,6 @@ following special fields:
       "b": "alert.b"
     }
   }
-#+end_src
-
-* COMMENT Babel
-
-** Variables
-
-#+NAME: mitigation-manager-port
-: 8333
-
-#+NAME: example-dummy-alert
-#+begin_src json-ts
-  {
-    "timestamp": "2024-10-22T09:31:15.007+0000",
-    "rule": {
-      "#condition": true
-    }
-
 #+end_src
 
 ** Code blocks
