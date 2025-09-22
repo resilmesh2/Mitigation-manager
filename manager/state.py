@@ -557,9 +557,12 @@ async def update(alert: Alert) -> set[Attack]:
     # 1: Add new attacks to state
     new_attack_graphs = await get_state_manager().retrieve_new_graphs(alert)
     for graph in new_attack_graphs:
-        new_attack = await get_state_manager().start_attack(graph)
-        await get_state_manager().advance(new_attack, alert)
-        state.append(new_attack)
+        if all([await c.is_met(alert) for c in graph.conditions]):
+            new_attack = await get_state_manager().start_attack(graph)
+            await get_state_manager().advance(new_attack, alert)
+            state.append(new_attack)
+        else:
+            log.debug('Discarding potential attack due to unfulfilled initial node conditions')
     log.debug('Final attack front after new graphs: %s', [str(a) for a in state])
 
     # 3: Update probability percentages
