@@ -1,8 +1,13 @@
-;; All macros here are designed to run within
-;; manager.model.Condition.is_met, so keep that in mind
+;; Copyright (C) 2025 Ekam Puri Nieto (UMU), Antonio Skarmeta Gomez
+;; (UMU), Jorge Bernal Bernabe (UMU).  See LICENSE file in the project
+;; root for details.
+
 (import hy [gensym])
 (import manager.state [get_state_manager])
 (import manager.isim [get_isim_manager])
+
+;; All macros here are designed to run within
+;; manager.model.Condition.is_met, so keep that in mind
 
 (defmacro prepare-function [#* body]
   "Create an async function wrapping Hy code.

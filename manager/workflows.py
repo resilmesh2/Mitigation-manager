@@ -1,3 +1,7 @@
+# Copyright (C) 2025 Ekam Puri Nieto (UMU), Antonio Skarmeta Gomez
+# (UMU), Jorge Bernal Bernabe (UMU).  See LICENSE file in the project
+# root for details.
+
 from manager.config import log
 from manager.model import AttackNode, Workflow
 from manager.state import get_state_manager
