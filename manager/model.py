@@ -44,6 +44,14 @@ class Alert(SimpleNamespace):
             'src_port': 'connection_src_port',
             'dst_port': 'connection_dst_port',
             'pid': 'connection_pid',
+            'attack_flow_alert': {
+                'source_ip': 'flow_source_ip',
+                'destination_ip': 'flow_destination_ip',
+                'source_port': 'flow_source_port',
+                'destination_port': 'flow_destination_port',
+                'attack_type': 'flow_attack_type',
+                'confidence': 'flow_confidence',
+            },
         },
     }
 
