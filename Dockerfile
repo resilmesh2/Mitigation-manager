@@ -1,20 +1,21 @@
-FROM python:3.11-alpine3.19
-MAINTAINER "ekam.purin@um.es"
-EXPOSE 8000
+FROM clojure:temurin-25-lein AS builder
 
-WORKDIR /usr/src/app
+WORKDIR /usr
 
-RUN apk update
+COPY project.clj .
+RUN lein deps
 
-COPY Pipfile Pipfile.lock ./
-RUN pip install --no-cache-dir micropipenv && \
-    micropipenv requirements > requirements.txt && \
-    pip install --no-cache-dir -r requirements.txt && \
-    pip uninstall -y micropipenv && \
-    rm Pipfile Pipfile.lock requirements.txt
+COPY src src
+RUN lein uberjar
 
-COPY manager ./manager
+FROM eclipse-temurin:25-jdk
+LABEL org.opencontainers.image.authors="Ekam Puri Nieto <ekam.purin@um.es>"
 
-COPY resources ./resources
+WORKDIR /usr
 
-ENTRYPOINT [ "sanic", "--host", "0.0.0.0", "manager.server:manager" ]
+COPY --from=builder /usr/target/uberjar/*-standalone.jar app.jar
+
+COPY config.edn .
+COPY data data
+
+ENTRYPOINT [ "java", "-jar", "app.jar" ]

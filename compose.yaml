@@ -1,0 +1,13 @@
+services:
+  mitigation_manager:
+    container_name: ResilMesh-MM
+    build:
+      context: .
+    expose:
+      - ${MM_PORT:-8002}
+    networks:
+      resilmesh:
+networks:
+  resilmesh:
+    external: true
+    name: resilmesh_network
