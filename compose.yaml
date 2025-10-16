@@ -1,6 +1,6 @@
 services:
   mitigation_manager:
-    container_name: ResilMesh-MM
+    container_name: Resilmesh-MM
     build:
       context: .
     expose:
