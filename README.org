@@ -54,7 +54,7 @@ following events:
 
 More specifically, the Mitigation Manager's default configuration includes a
 simple attack flow that assumes an attacker performing the aforementioned steps
-in sequence.
+in sequence.  Additionally, it includes the attack flows used during Pilot 1.
 
 Detection of these events requires the Mitigation Manager to understand the
 format of their corresponding alerts received through NATS.  The default
