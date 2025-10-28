@@ -6,8 +6,4 @@ services:
     expose:
       - ${MM_PORT:-8002}
     networks:
-      resilmesh:
-networks:
-  resilmesh:
-    external: true
-    name: resilmesh_network
+      - resilmesh_network
