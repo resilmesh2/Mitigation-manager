@@ -39,9 +39,19 @@
                             :msg nil}
                            @(http/post url {:body json-body
                                             :content-type :json}))]
-    (t/log! {:msg "Workflow instance executed"})
-    (when (= 200 (:status response))
-      (t/log! {:level :debug
-               :data (:body response)
-               :msg "Workflow response"})
-      (:body response))))
+    (t/log! {:level :debug
+             :data (:body response)
+             :msg "Workflow response"})
+    (cond
+      ((= 200 (:status response))
+       (t/log! {:msg "Workflow instance executed"})
+       (:body response))
+      ((or (>= 300 (:status response))
+           (< 200 (:status response)))
+       (t/log! {:level :warn
+                :data {:status-code (:status response)}
+                :msg "Workflow instance execution failed"}))
+      (:else
+       (t/log! {:level :warn
+                :data {:status-code (:status response)}
+                :msg "Workflow instance execution returned an unexpected status code"})))))
