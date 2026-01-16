@@ -1,7 +1,5 @@
 services:
-  mitigation_manager:
-    container_name: resilmesh_sop_mm
-    hostname: resilmesh_sop_mm
+  resilmesh-sop-mm:
     build:
       context: .
     expose:
