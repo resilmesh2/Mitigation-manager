@@ -1,5 +1,6 @@
 services:
   resilmesh-sop-mm:
+    container_name: resilmesh-sop-mm
     build:
       context: .
     expose:
