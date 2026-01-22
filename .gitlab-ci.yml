@@ -30,8 +30,6 @@ Resilmesh GitHub upload:
   image: alpine:latest
   variables:
     GIT_DEPTH: 0
-  tags:
-    - docker
   before_script:
     - apk add --no-cache git openssh-client
     - git config --global user.email "${GITHUB_EMAIL}"
