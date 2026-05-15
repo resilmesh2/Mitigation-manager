@@ -1,6 +1,6 @@
-;; Copyright (C) 2025 Ekam Puri Nieto (UMU), Antonio Skarmeta Gomez
-;; (UMU), Jorge Bernal Bernabe (UMU).  See LICENSE file in the project
-;; root for details.
+;; Copyright (C) 2025, 2026 Ekam Puri Nieto (UMU), Antonio Skarmeta
+;; Gomez (UMU), Jorge Bernal Bernabe (UMU).  See LICENSE file in the
+;; project root for details.
 
 (ns mitigation-engine.nats
   (:require
@@ -19,7 +19,6 @@
 
 (defn- handle-alert [alert]
   (-> alert
-      (json/parse-string true)
       (alert/to-alert)
       (core/handle-alert)))
 
@@ -28,7 +27,9 @@
         ssl (:nats-ssl core/config)
         con (nats/make-connection {:urls [url]
                                    :secure? ssl})
-        sub (nats/subscribe con (:nats-topic core/config) handle-alert {})]
+        sub (nats/subscribe con (:nats-topic core/config)
+                            (comp handle-alert nats-message-to-edn)
+                            {:deserializer nil})]
     {:connection con
      :subscription sub}))
 

@@ -43,289 +43,91 @@ rename it to =.env=, and replace any values as desired.
   docker compose down --remove-orphans
 #+end_src
 
-* Default configuration
+* Configuration
 
-The Mitigation Manager is, by default, configured to detect and respond to the
-following events:
+The AI planning engine builds mitigations through a combination of attack
+graphs, detailed conditions, CoA playbooks encoded into workflows, and data
+encoded in the alert.  In order to be efficient across a wide range of
+scenarios, these aspects can all be configured through the included Extensive
+Data Notation (EDN) files located inside the =data/= directory.
 
-- Remote connection using ~ncat~.
-- Execution permissions added to Python files.
-- Ransomware signature detected in a downloaded file.
+The EDN files included in the repository contain a series of examples used
+during development, together with real data used during Resilmesh pilots.
+Detailed descriptions of their contents and how to populate them are found
+below:
 
-More specifically, the Mitigation Manager's default configuration includes a
-simple attack flow that assumes an attacker performing the aforementioned steps
-in sequence.  Additionally, it includes the attack flows used during Pilot 1.
+** Alert field mappings
 
-Detection of these events requires the Mitigation Manager to understand the
-format of their corresponding alerts received through NATS.  The default
-configuration assumes the alerts follow a format similar to Wazuh rules with the
-following special fields:
+Located inside =data/field-mappings.edn=, this file contains a vector of Clojure
+maps used to extract information from incoming alerts.  Each map is used as a
+mapping data structure that mirrors the shape of the input JSON:
 
-** Remote connection alert
+- If a value in the map is another map, traversal continues recursively.
 
-#+NAME: example-rule-100002
-#+begin_src json-ts
-  {
-    "timestamp": "2024-10-22T09:31:15.007+0000",
-    "rule": {
-      "level": 14,
-      "description": "Connection via ncat from source port 11234 to 192.168.200.1:36210. PID: 3613",
-      "id": "100002",
-      "mitre": {
-        "id": [
-          "T1041",
-          "T1219"
-        ],
-        "tactic": [
-          "Exfiltration",
-          "Command and Control"
-        ],
-        "technique": [
-          "Exfiltration Over C2 Channel",
-          "Remote Access Software"
-        ]
-      },
-      "firedtimes": 1,
-      "mail": true,
-      "groups": [
-        "established_conn"
-      ]
-    },
-    "agent": {
-      "id": "001",
-      "name": "eeb0036baf28",
-      "ip": "192.168.200.200"
-    },
-    "manager": {
-      "name": "wazuh.manager"
-    },
-    "id": "1729589475.25117",
-    "full_log": "ncat 3613 848a20e98d52:11234->192.168.200.1:36210",
-    "decoder": {
-      "name": "lsof_ncat_decoder"
-    },
-    "data": {
-      "pid": "3613",
-      "src_port": "11234",
-      "dst_ip": "192.168.200.1",
-      "dst_port": "36210"
-    },
-    "location": "command_ncat_conn"
-  }
-#+end_src
+- If a value in the map is a keyword, that keyword becomes the field name in the
+  flattened output.
 
-** Execute permissions alert
+- The corresponding value from the input JSON is extracted and placed in the
+  output under the new field name.
 
-#+NAME: example-rule-100003
-#+begin_src json-ts
-  {
-    "timestamp": "2024-10-22T09:18:46.153+0000",
-    "rule": {
-      "level": 8,
-      "description": "Execute permission added to python script.",
-      "id": "100003",
-      "mitre": {
-        "id": [
-          "T1222.002"
-        ],
-        "tactic": [
-          "Defense Evasion"
-        ],
-        "technique": [
-          "Linux and Mac File and Directory Permissions Modification"
-        ]
-      },
-      "firedtimes": 4,
-      "mail": false,
-      "groups": [
-        "syscheck"
-      ]
-    },
-    "agent": {
-      "id": "001",
-      "name": "eeb0036baf28",
-      "ip": "192.168.200.200"
-    },
-    "manager": {
-      "name": "wazuh.manager"
-    },
-    "id": "1729588726.22091",
-    "full_log": "File '/tmp/zerologon_tester.py' modified\nMode: realtime\nChanged attributes: permission\nPermissions changed from 'rw-r--r--' to 'rwxr-xr-x'\n",
-    "syscheck": {
-      "path": "/tmp/zerologon_tester.py",
-      "mode": "realtime",
-      "size_after": "3041",
-      "perm_before": "rw-r--r--",
-      "perm_after": "rwxr-xr-x",
-      "uid_after": "0",
-      "gid_after": "0",
-      "md5_after": "0008432c27c43f9fe58e9bf191f9c6cf",
-      "sha1_after": "84dc56d99268f70619532536f8445f56609547c7",
-      "sha256_after": "b8ae48c2e46c28f1004e006348af557c7d912036b9ead88be67bca2bafde01d3",
-      "uname_after": "root",
-      "gname_after": "root",
-      "mtime_after": "2024-10-22T09:16:02",
-      "inode_after": 151477998,
-      "changed_attributes": [
-        "permission"
-      ],
-      "event": "modified"
-    },
-    "decoder": {
-      "name": "syscheck_integrity_changed"
-    },
-    "location": "syscheck"
-  }
-#+end_src
+- Any fields not present in the mapping are ignored.
 
-** File added alert
+The result is a flexible data structure able to parse arbitrary JSON alerts and
+extract known valuable fields in a deterministic and reliable fashion.  These
+fields are then used when running attack graph conditions, and to initialize
+workflow parameters.
 
-#+NAME: example-rule-100004
-#+begin_src json-ts
-  {
-    "timestamp": "2024-10-22T09:25:39.991+0000",
-    "rule": {
-      "level": 8,
-      "description": "Executable file added to filesystem",
-      "id": "100004",
-      "mitre": {
-        "id": [
-          "T1204.002"
-        ],
-        "tactic": [
-          "Execution"
-        ],
-        "technique": [
-          "Malicious File"
-        ]
-      },
-      "firedtimes": 8,
-      "mail": false,
-      "groups": [
-        "filesystem"
-      ]
-    },
-    "agent": {
-      "id": "001",
-      "name": "eeb0036baf28",
-      "ip": "192.168.200.200"
-    },
-    "manager": {
-      "name": "wazuh.manager"
-    },
-    "id": "1729589139.24598",
-    "full_log": "File '/tmp/zerologon_tester.py' added\nMode: realtime\n",
-    "syscheck": {
-      "path": "/tmp/zerologon_tester.py",
-      "mode": "realtime",
-      "size_after": "3041",
-      "perm_after": "rw-r--r--",
-      "uid_after": "0",
-      "gid_after": "0",
-      "md5_after": "0008432c27c43f9fe58e9bf191f9c6cf",
-      "sha1_after": "84dc56d99268f70619532536f8445f56609547c7",
-      "sha256_after": "b8ae48c2e46c28f1004e006348af557c7d912036b9ead88be67bca2bafde01d3",
-      "uname_after": "root",
-      "gname_after": "root",
-      "mtime_after": "2024-10-22T09:25:39",
-      "inode_after": 151477998,
-      "event": "added"
-    },
-    "decoder": {
-      "name": "syscheck_new_entry"
-    },
-    "location": "syscheck"
-  }
-#+end_src
+** Queries
 
-** Flow Processor alert
+To extract useful information and verify that requirements are met, we use
+"queries".  A query is a Clojure keyword associated to a vector, representing
+the name/contents of the query. A contents vector will always contain one
+keyword (the "type" of the query) and a second value that changes based on the
+type:
 
-#+NAME: example-rule-100100
-#+begin_src json-ts
-  {
-    "input": {
-      "type": "log"
-    },
-    "agent": {
-      "name": "wazuh.manager",
-      "id": "000"
-    },
-    "manager": {
-      "name": "wazuh.manager"
-    },
-    "data": {
-      "attack_flow_alert": {
-        "multi_class_accuracy": "0.998451",
-        "datetime": "2025-09-08 11:43:33.943443",
-        "destination_ip": "10.185.2.97",
-        "destination_port": "3306",
-        "attack_type": "Slowloris",
-        "source_port": "54026",
-        "confidence": "0.999998",
-        "flow_features": {
-          "max_ttl_dl": "64",
-          "numbytes_ul": "1682",
-          "avg_iat_ul": "47.388889",
-          "min_ttl_dl": "63",
-          "numpackets_1s_dl": "10014.306152",
-          "stddev_iat_dl": "92.854313",
-          "numpackets_dl": "14",
-          "numbytes_dl": "2522",
-          "min_ttl_ul": "63",
-          "flow_duration": "0.001398",
-          "numpackets_1s_ul": "12875.536481",
-          "min_iat_dl": "0",
-          "min_packetsize_dl": "66",
-          "stddev_packetsize_dl": "232.712839",
-          "numpackets_ul": "18",
-          "avg_packetsize_ul": "93.444444",
-          "numpackets_ratio": "0",
-          "bits_1s_dl": "1804005.722461",
-          "min_iat_ul": "0",
-          "avg_ttl_dl": "63.500000",
-          "stddev_packetsize_ul": "57.412951",
-          "stddev_ttl_dl": "0.500000",
-          "min_packetsize_ul": "66",
-          "avg_packetsize_dl": "180.142857",
-          "max_iat_dl": "0",
-          "max_packetsize_dl": "745",
-          "max_ttl_ul": "64",
-          "stddev_iat_ul": "78.013630",
-          "bits_1s_ul": "1203147.353362",
-          "stddev_ttl_ul": "0.500000",
-          "avg_ttl_ul": "63.500000",
-          "avg_iat_dl": "38.928571",
-          "max_packetsize_ul": "250",
-          "max_iat_ul": "286"
-        },
-        "source_ip": "127.0.0.1"
-      }
-    },
-    "rule": {
-      "firedtimes": 10,
-      "mail": true,
-      "level": 12,
-      "description": "Attack Flow Detected: Slowloris from 10.185.2.97 to 127.0.0.1.",
-      "groups": [
-        "attack_flow"
-      ],
-      "id": "100100",
-      "mitre": {
-        "id": [
-          "T1110",
-          "T1499"
-        ]
-      }
-    },
-    "location": "API-Webhook",
-    "decoder": {
-      "name": "json"
-    },
-    "id": "1757331811.18627989",
-    "full_log": "{\"attack_flow_alert\": {\"datetime\": \"2025-09-08 11:43:33.943443\", \"source_ip\": \"10.185.2.97\", \"source_port\": 54026, \"destination_ip\": \"127.0.0.1\", \"destination_port\": 3306, \"multi_class_accuracy\": 0.998450765321931, \"attack_type\": \"Slowloris\", \"confidence\": 0.9999980926513672, \"flow_features\": {\"flow_duration\": 0.001398, \"numpackets_ul\": 18, \"numpackets_dl\": 14, \"numpackets_ratio\": 0, \"numpackets_1s_ul\": 12875.536480686695, \"numpackets_1s_dl\": 10014.306151645207, \"numbytes_ul\": 1682, \"numbytes_dl\": 2522, \"bits_1s_ul\": 1203147.3533619456, \"bits_1s_dl\": 1804005.722460658, \"max_packetsize_ul\": 250, \"max_packetsize_dl\": 745, \"min_packetsize_ul\": 66, \"min_packetsize_dl\": 66, \"avg_packetsize_ul\": 93.44444444444443, \"avg_packetsize_dl\": 180.14285714285717, \"stddev_packetsize_ul\": 57.412950747895266, \"stddev_packetsize_dl\": 232.71283872215227, \"max_ttl_ul\": 64, \"max_ttl_dl\": 64, \"min_ttl_ul\": 63, \"min_ttl_dl\": 63, \"avg_ttl_ul\": 63.5, \"avg_ttl_dl\": 63.5, \"stddev_ttl_ul\": 0.5, \"stddev_ttl_dl\": 0.5, \"max_iat_ul\": 286, \"max_iat_dl\": 0, \"min_iat_ul\": 0, \"min_iat_dl\": 0, \"avg_iat_ul\": 47.388888888888886, \"avg_iat_dl\": 38.92857142857143, \"stddev_iat_ul\": 78.01363049627851, \"stddev_iat_dl\": 92.85431314369707}}}",
-    "timestamp": "2025-09-08T11:43:31.955+0000"
-  }
-#+end_src
+- If the type is =:static=, the value is a JSON-encodable primitive.
+
+- If the type is =:alert=, the value is a keyword.  This keyword is then used to
+  extract the actual value from the map structure obtained during the alert
+  field mapping process.
+
+- If the type is =:ctx=, the value is a keyword.  This keyword is then used to
+  extract the actual value from the currently evaluated attack's context.  This
+  context will be further explained in subsequent sections.
+
+- If the type is =:eval=, the value is a Clojure sequence that will be evaluated
+  at runtime.  This sequence will have access to both ~*alert*~ and ~*ctx*~, two
+  variables containing the aforementioned alert and attack context maps.
+
+** Workflows
+
+Located inside =data/workflows.edn=, this file contains a vector of Clojure maps
+representing the available workflows.  Each workflow contains a textual
+description, a URL to make a POST request to (generally populated with Shuffle
+webhook endpoint URLs), an execution cost, an associated MITRE ATT&CK Technique
+ID, and a map of queries used to initialize the workflow parameters.
+
+** Attack graphs
+
+Located inside =data/attack-graphs.edn=, this file contains a vector of known
+attack patterns.  Each attack pattern consists of a UUID identifier, a
+description, an orderless sequence of nodes, and a reference to the initial
+node.
+
+Each node contains its own UUID identifier, a textual description, a sequence of
+associated MITRE ATT&CK Technique IDs, references to both previous and next
+nodes, a map of values to extract (in the form of queries), and a map of
+conditions (in the form of queries).  These conditions are used in order to
+guarantee that a certain attack graph node has been confirmed to have occurred.
+Conditions are considered to be fulfilled as long as the associated query
+returns non-nil (note that, as a consequence, values such as ~false~ or ~'()~
+will be treated as the condition being fulfilled).
+
+Once a node's conditions are verified and the node is considered "triggered", it
+will extract a series of values using queries, which will then be stored in the
+attack instance's context (ctx for short).  This allows an attack graph to
+define valuable pattern-specific data to be remembered for current and future
+mitigations.
 
 * COMMENT Babel
 

@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2025 Ekam Puri Nieto (UMU), Antonio Skarmeta Gomez
- * (UMU), Jorge Bernal Bernabe (UMU).
+ * Copyright (C) 2025, 2026 Ekam Puri Nieto (UMU), Antonio Skarmeta
+ * Gomez (UMU), Jorge Bernal Bernabe (UMU).
  *
  * See LICENSE file in the project root for details.
  */
@@ -16,7 +16,7 @@ public class Mitigation {
     @PlanningVariable(nullable = true, valueRangeProviderRefs = "workflows")
     private WorkflowInstance workflow;
 
-    @PlanningVariable(nullable = false, valueRangeProviderRefs = "alerts")
+    @PlanningVariable(nullable = true, valueRangeProviderRefs = "alerts")
     private Alert alert;
 
     public WorkflowInstance getWorkflow() {
@@ -24,7 +24,19 @@ public class Mitigation {
     }
 
     public boolean invalid() {
-        return workflow != null && !workflow.getSignature().applicableTo(alert);
+        if (workflow == null)
+            return true;
+
+        if (alert == null)
+            return true;
+
+        if (!workflow.getSignature().applicableTo(alert))
+            return true;
+
+        if (!workflow.valid())
+            return true;
+
+        return false;
     }
 
     public Alert getAlert() {

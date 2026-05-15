@@ -1,6 +1,6 @@
-;; Copyright (C) 2025 Ekam Puri Nieto (UMU), Antonio Skarmeta Gomez
-;; (UMU), Jorge Bernal Bernabe (UMU).  See LICENSE file in the project
-;; root for details.
+;; Copyright (C) 2025, 2026 Ekam Puri Nieto (UMU), Antonio Skarmeta
+;; Gomez (UMU), Jorge Bernal Bernabe (UMU).  See LICENSE file in the
+;; project root for details.
 
 (ns mitigation-engine.state.common
   (:require
@@ -11,8 +11,8 @@
 
 (s/def ::id uuid?)
 (s/def ::description string?)
-(s/def ::params map?)
-(s/def ::args map?)
+(s/def ::parameters map?)
+(s/def ::conditions map?)
 (s/def ::mitre-id string?)
 
 (defmacro list [of]

@@ -1,14 +1,14 @@
-FROM clojure:temurin-25-lein AS builder
+FROM docker.io/library/clojure:temurin-25-lein AS builder
 
 WORKDIR /usr
 
 COPY project.clj .
-RUN lein deps
+RUN --mount=type=cache,target=/root/.m2 lein deps
 
 COPY src src
-RUN lein uberjar
+RUN --mount=type=cache,target=/root/.m2 lein uberjar
 
-FROM eclipse-temurin:25-jdk
+FROM docker.io/library/eclipse-temurin:25-jdk
 LABEL org.opencontainers.image.authors="Ekam Puri Nieto <ekam.purin@um.es>"
 
 WORKDIR /usr

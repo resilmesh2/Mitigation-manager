@@ -1,14 +1,28 @@
-;; Copyright (C) 2025 Ekam Puri Nieto (UMU), Antonio Skarmeta Gomez
-;; (UMU), Jorge Bernal Bernabe (UMU).  See LICENSE file in the project
-;; root for details.
+;; Copyright (C) 2025, 2026 Ekam Puri Nieto (UMU), Antonio Skarmeta
+;; Gomez (UMU), Jorge Bernal Bernabe (UMU).  See LICENSE file in the
+;; project root for details.
 
 (ns mitigation-engine.main
   (:gen-class)
   (:require
    [taoensso.telemere :as t]
-   [mitigation-engine.server :as server]
+   [mount.core :as mount]
    [mitigation-engine.core :as core]
-   [mount.core :as mount]))
+
+   ;; Import all namespaces with side effects.  Explicitly import
+   ;; namespaces even if they're implicitly loaded from a different
+   ;; one.
+
+   ;; defdb
+   [mitigation-engine.state.alert]
+   [mitigation-engine.state.attack-graph]
+   [mitigation-engine.state.workflow]
+   [mitigation-engine.state.attack]
+   ;; defstate
+   [mitigation-engine.core]
+   [mitigation-engine.csap]
+   [mitigation-engine.nats]
+   [mitigation-engine.server]))
 
 (defn- start []
   (t/log! "Starting server")

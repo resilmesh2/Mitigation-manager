@@ -1,12 +1,12 @@
 {:version [0 1 0]
- :port #or [#env MM_PORT 8002]
- :isim-host #or [#env ISIM_HOST "resilmesh-sap-isim"]
- :isim-port #or [#env ISIM_PORT 7687]
- :isim-username #or [#env ISIM_USERNAME "neo4j"]
- :isim-password #or [#env ISIM_PASSWORD "supertestovaciheslo"]
- :nats-host #or [#env MB_HOST "resilmesh-ap-nats"]
- :nats-port #or [#env MB_PORT 4222]
- :nats-topic #or [#env MB_TOPIC "alerts"]
+ :port #long #or [#env MM_PORT 8002]
+ :csap-host #or [#env CSAP_HOST "localhost"]
+ :csap-port #long #or [#env CSAP_PORT 7687]
+ :csap-username #or [#env CSAP_USERNAME "neo4j"]
+ :csap-password #or [#env CSAP_PASSWORD "neo4j"]
+ :nats-host #or [#env NATS_HOST "localhost"]
+ :nats-port #long #or [#env NATS_PORT 4222]
+ :nats-topic #or [#env NATS_TOPIC "alerts"]
  :minimum-logging-level :debug
  :disallowed-logging-namespaces ["org.drools.*"
                                  "org.optaplanner.core.impl.*"

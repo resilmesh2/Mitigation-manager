@@ -1,102 +1,206 @@
-[{:description "Test - ncat to ransomware",
+[{:id #uuid "f5af4dfe-0973-403c-9d15-f82c65b1d203"
+  :description "Test - ncat to ransomware",
   :nodes
   ({:id #uuid "d422d11d-1667-4bc3-93e0-8a36f2a64654",
     :description "Remote connection using ncat",
     :mitre-ids ("T1041"),
-    :conditions (),
+    :conditions {},
+    :extract {},
     :next (#uuid "bf4f7379-a0b1-4f87-8771-e43af18ca6c8"),
     :previous ()}
    {:id #uuid "bf4f7379-a0b1-4f87-8771-e43af18ca6c8",
     :description "Python script execution permission change",
     :mitre-ids ("T1222.002"),
     :conditions
-    ({:description "File is a Python script",
-      :params {},
-      :args {:path :file-path},
-      :query (and (:path *args*)
-                  (clojure.string/ends-with? (:path *args*) ".py"))}
-     {:description "File is executable",
-      :params {},
-      :args {:permissions :file-permissions},
-      :query (and (:path *args*)
-                  (clojure.string/includes? (:path *args*) "x"))}),
+    {:file-is-python-script
+     [:eval (and (:file-path *ctx*)
+             (clojure.string/ends-with? (:file-path *ctx*) ".py"))]
+     :file-is-executable
+     [:eval (and (:file-permissions *ctx*)
+             (clojure.string/includes? (:file-permissions *ctx*) "x"))]},
+    :extract {}
     :previous (#uuid "d422d11d-1667-4bc3-93e0-8a36f2a64654"),
     :next (#uuid "f4c86f49-1a00-4dbd-a165-ca8f91c6d48c")}
    {:id #uuid "f4c86f49-1a00-4dbd-a165-ca8f91c6d48c",
     :description "Ransomware script download",
     :mitre-ids ("T1204.002"),
     :conditions
-    ({:description "File is a Python script",
-      :params {},
-      :args {:path :file-path},
-      :query (and (:path *args*)
-                  (clojure.string/ends-with? (:path *args*) ".py"))}
-     {:description "File is ransomware",
-      :params {},
-      :args {:path :file-path},
-      :query (and (:path *args*)
-                  (clojure.string/includes? (:path *args*) "zerologon"))}),
+    {:file-is-python-script
+     [:eval (and (:file-path *ctx*)
+             (clojure.string/ends-with? (:file-path *ctx*) ".py"))]
+     :file-is-ransomware
+     [:eval (and (:file-path *ctx*)
+             (clojure.string/includes? (:file-path *ctx*) "zerologon"))]},
+    :extract {},
     :next (),
     :previous (#uuid "bf4f7379-a0b1-4f87-8771-e43af18ca6c8")}),
-  :attacks {},
   :initial-node #uuid "d422d11d-1667-4bc3-93e0-8a36f2a64654"}
- {:description "Pilot 1 - CARM - DoS",
+ {:id #uuid "f3e404af-7dab-4c51-8532-97bb4dbb0749"
+  :description "Pilot 1 - CARM - DoS",
   :nodes
   ({:id #uuid "69573b91-b21e-4df4-8714-36514ddd46be",
     :description "DoS attack using Slowloris",
     :mitre-ids ("T1499"),
     :conditions
-    ({:description "Firewall available",
-      :params {:firewall-network "10.185.2.96/28"},
-      :args {:victim-ip :flow-destination-ip},
-      :query (and (:victim-ip *args*)
-                  (let [ip->long #(reduce (fn [acc b] (+ (bit-shift-left acc 8) (bit-and b 0xFF)))
-                                          0
-                                          (.getAddress (java.net.InetAddress/getByName %)))
-                        [net mask-bits] (clojure.string/split (:firewall-network *args*) #"/")
-                        mask-bits (Integer/parseInt mask-bits)
-                        ip-long (ip->long (:victim-ip *args*))
-                        net-long (ip->long net)
-                        mask (bit-shift-left -1 (- 32 mask-bits))]
-                    (= (bit-and ip-long mask)
-                       (bit-and net-long mask))))},
-     {:description "DoS alert type",
-      :params {:valid-identifiers ("Slowloris")},
-      :args {:attack-type :flow-attack-type},
-      :query (and (:attack-type *args*)
-                  (some #(= (:attack-type *args*) %)
-                        (:valid-identifiers *args*)))}),
+    {:firewall-available
+     [:eval (when-let [victim-ip (:flow-destination-ip *alert*)]
+             (let [firewall-ip "10.185.2.98"
+                   mask-bits 28
+                   ip->long #(reduce (fn [acc b] (+ (bit-shift-left acc 8) (bit-and b 0xFF)))
+                              0
+                              (.getAddress (java.net.InetAddress/getByName %)))
+                   mask (bit-shift-left -1 (- 32 mask-bits))]
+              (= (bit-and (ip->long firewall-ip) mask)
+               (bit-and (ip->long victim-ip) mask))
+              ))]
+     :dos-alert-type
+     [:eval (when-let [attack-type (:flow-attack-type *alert*)]
+             (let [valid-identifiers ["Slowloris"]]
+              (some #(= attack-type %) valid-identifiers)))]}
+    :extract {},
     :next (),
     :previous ()}),
-  :attacks {},
   :initial-node #uuid "69573b91-b21e-4df4-8714-36514ddd46be"}
- {:description "Pilot 1 - CARM - Bruteforce",
+ {:id #uuid "665c2994-a11f-4536-ad81-f8b2b986fc2b"
+  :description "Pilot 1 - CARM - Bruteforce",
   :nodes
   ({:id #uuid "81e4d895-502a-4a15-84e7-c142392062a5",
     :description "Bruteforce attack using Hydra",
     :mitre-ids ("T1110"),
     :conditions
-    ({:description "Firewall available",
-      :params {:firewall-network "10.185.2.96/28"},
-      :args {:victim-ip :flow-destination-ip},
-      :query (and (:victim-ip *args*)
-                  (let [ip->long #(reduce (fn [acc b] (+ (bit-shift-left acc 8) (bit-and b 0xFF)))
-                                          0
-                                          (.getAddress (java.net.InetAddress/getByName %)))
-                        [net mask-bits] (clojure.string/split (:firewall-network *args*) #"/")
-                        mask-bits (Integer/parseInt mask-bits)
-                        ip-long (ip->long (:victim-ip *args*))
-                        net-long (ip->long net)
-                        mask (bit-shift-left -1 (- 32 mask-bits))]
-                    (= (bit-and ip-long mask)
-                       (bit-and net-long mask))))},
-     {:description "Bruteforce alert type",
-      :params {:valid-identifiers ("Bruteforce")},
-      :args {:attack-type :flow-attack-type},
-      :query (and (:attack-type *args*)
-                  (some #(= (:attack-type *args*) %)
-                        (:valid-identifiers *args*)))}),
+    {:firewall-available
+     [:eval (when-let [victim-ip (:flow-destination-ip *alert*)]
+             (let [firewall-ip "10.185.2.98"
+                   mask-bits 28
+                   ip->long #(reduce (fn [acc b] (+ (bit-shift-left acc 8) (bit-and b 0xFF)))
+                              0
+                              (.getAddress (java.net.InetAddress/getByName %)))
+                   mask (bit-shift-left -1 (- 32 mask-bits))]
+              (= (bit-and (ip->long firewall-ip) mask)
+               (bit-and (ip->long victim-ip) mask))
+              ))]
+     :bruteforce-alert-type
+     [:eval (when-let [attack-type (:flow-attack-type *alert*)]
+             (let [valid-identifiers ["Bruteforce"]]
+              (some #(= attack-type %) valid-identifiers)))]},
+    :extract {}
     :next (),
     :previous ()}),
-  :attacks {},
-  :initial-node #uuid "81e4d895-502a-4a15-84e7-c142392062a5"}]
+  :initial-node #uuid "81e4d895-502a-4a15-84e7-c142392062a5"}
+ {:id #uuid "7cc4e993-6544-4c66-8879-d74bd98abbec"
+  :description "Pilot 2 - CARM - Windows LFI",
+  :nodes
+  ({:id #uuid "b6c39a9a-2eb4-4ac3-b3f8-dede91fb659a",
+    :description "Kerberoasting attack",
+    :mitre-ids ("T1190"),
+    :conditions
+    {:stix-objects-available
+     [:alert :stix-bundle-objects]
+     :correct-alert-type
+     [:alert :alert-integration]
+     :kerberoasting-alert-type
+     [:eval (-> *alert* :alert-integration (= "correlated_attack_report") (or nil))]},
+    :extract
+    {:windows-active-directory-account-name
+     [:eval (-> *alert* :stix-bundle-objects (nth 2) :account_login)]}
+    :next (),
+    :previous ()}),
+  :initial-node #uuid "b6c39a9a-2eb4-4ac3-b3f8-dede91fb659a"}
+ {:id #uuid "665c2994-a11f-4536-ad81-f8b2b986fc2b"
+  :description "Pilot 2 - CARM - Known vulnerability",
+  :nodes
+  ({:id #uuid "81e4d895-502a-4a15-84e7-c142392062a5",
+    :description "Scan using nmap",
+    :mitre-ids ("T1046"),
+    :conditions
+    {:stix-objects-available
+     [:alert :stix-bundle-objects]
+     :correct-alert-type
+     [:alert :alert-integration]
+     :nmap-alert-type
+     [:eval (-> *alert* :alert-integration (= "nmap_flow_to_stix") (or nil))]
+     :firewall-available
+     [:eval (when-let [victim-ip (let [objects (:stix-bundle-objects *alert*)]
+                                  (->> objects
+                                   (filter #(= (:relationship_type %) "targets"))
+                                   first
+                                   :target_ref
+                                   (get (into {} (map (juxt :id identity) objects)))
+                                   :value))]
+             (let [firewall-ip "192.168.56.1"
+                   mask-bits 24
+                   ip->long #(reduce (fn [acc b] (+ (bit-shift-left acc 8) (bit-and b 0xFF)))
+                              0
+                              (.getAddress (java.net.InetAddress/getByName %)))
+                   mask (bit-shift-left -1 (- 32 mask-bits))]
+              (= (bit-and (ip->long firewall-ip) mask)
+               (bit-and (ip->long victim-ip) mask))
+              ))]},
+    :extract
+    {:ip-src
+     [:eval (let [objects (:stix-bundle-objects *alert*)
+                  by-id (into {} (map (juxt :id identity) objects))]
+             (->> objects
+              (filter #(= (:type %) "network-traffic"))
+              first
+              :src_ref
+              (get by-id)
+              :value))]
+     :ip-dst
+     [:eval (let [objects (:stix-bundle-objects *alert*)]
+             (->> objects
+              (filter #(= (:relationship_type %) "targets"))
+              first
+              :target_ref
+              (get (into {} (map (juxt :id identity) objects)))
+              :value))]
+     :firewall-ip
+     [:static "192.168.56.1"]}
+    :next (),
+    :previous ()}),
+  :initial-node #uuid "81e4d895-502a-4a15-84e7-c142392062a5"}
+ {:id #uuid "2168d2b0-dd5c-4f6a-9208-d60feaad3845"
+  :description "Pilot 2 - CARM - XXE",
+  :nodes
+  ({:id #uuid "d713e5d7-4683-481d-8f3e-11642d1f4805",
+    :description "XXE detected with Suricata",
+    :mitre-ids ("T1190"),
+    :conditions
+    {:stix-objects-available
+     [:alert :stix-bundle-objects]
+     :correct-alert-type
+     [:alert :alert-integration]
+     :xxe-alert-type
+     [:eval (-> *alert* :alert-integration (= "xxe_flow_to_stix") (or nil))]},
+    :extract
+    {:portal-ip [:eval (let [url (->> (:stix-bundle-objects *alert*)
+                                  (filter #(= (:type %) "url"))
+                                  first
+                                  :value)]
+                        (-> (java.net.URI. url) .getHost))]
+     :disable-comments [:static true]},
+    :next (),
+    :previous ()}),
+  :initial-node #uuid "d713e5d7-4683-481d-8f3e-11642d1f4805"}
+ {:id #uuid "38f3c2c7-9be8-414b-ba9b-ca626eac7000"
+  :description "Pilot 1 - CARM - Phishing",
+  :nodes
+  ({:id #uuid "d5174515-f26b-42aa-b933-fad2a906f795",
+    :description "Phishing attack",
+    :mitre-ids ("T1566"),
+    :conditions
+    {:stix-objects-available
+     [:alert :stix-bundle-objects]
+     :correct-alert-type
+     [:alert :alert-integration]
+     :phishing-alert-type
+     [:eval (-> *alert* :alert-integration (= "phishing_flow_to_stix") (or nil))]},
+    :extract
+    {:ip-src [:eval (->> (:stix-bundle-objects *alert*)
+                     (filter #(= (:type %) "ipv4-addr"))
+                     first
+                     :value)]
+     :firewall-ip [:static "192.168.56.1"]},
+    :next (),
+    :previous ()}),
+  :initial-node #uuid "d5174515-f26b-42aa-b933-fad2a906f795"}]

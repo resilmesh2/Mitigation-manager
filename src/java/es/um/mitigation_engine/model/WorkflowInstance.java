@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2025 Ekam Puri Nieto (UMU), Antonio Skarmeta Gomez
- * (UMU), Jorge Bernal Bernabe (UMU).
+ * Copyright (C) 2025, 2026 Ekam Puri Nieto (UMU), Antonio Skarmeta
+ * Gomez (UMU), Jorge Bernal Bernabe (UMU).
  *
  * See LICENSE file in the project root for details.
  */
@@ -41,6 +41,16 @@ public class WorkflowInstance {
     public int getCost() {
         return (int)Math.round(signature.getCost() * costFactor * 1000);
     }
+
+    public boolean valid() {
+        for (Object o : this.parameters.values()) {
+            if (o == null) {
+                return false;
+            }
+        }
+        return true;
+    }
+
 
     @Override
     public String toString() {

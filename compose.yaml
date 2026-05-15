@@ -1,13 +1,16 @@
 services:
-  resilmesh-sop-mm:
-    container_name: resilmesh-sop-mm
+  mitigation-manager:
+    container_name: ${CONTAINER_PREFIX}Mitigation-Manager
+    env_file:
+      - path: .env
+        required: false
     build:
       context: .
     expose:
-      - ${MM_PORT:-8002}
+      - ${PORT:-8002}
     networks:
-      resilmesh:
+      external:
 networks:
-  resilmesh:
+  external:
     external: true
-    name: resilmesh_network
+    name: ${CONTAINER_NETWORK}

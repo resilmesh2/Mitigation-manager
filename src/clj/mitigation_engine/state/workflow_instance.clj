@@ -1,6 +1,6 @@
-;; Copyright (C) 2025 Ekam Puri Nieto (UMU), Antonio Skarmeta Gomez
-;; (UMU), Jorge Bernal Bernabe (UMU).  See LICENSE file in the project
-;; root for details.
+;; Copyright (C) 2025, 2026 Ekam Puri Nieto (UMU), Antonio Skarmeta
+;; Gomez (UMU), Jorge Bernal Bernabe (UMU).  See LICENSE file in the
+;; project root for details.
 
 (ns mitigation-engine.state.workflow-instance
   (:require
@@ -43,16 +43,19 @@
              :data (:body response)
              :msg "Workflow response"})
     (cond
+      (not (contains? response :status))
+      (t/log! {:level :error
+               :data {:response response}
+               :msg "Workflow instance execution returned no status code"})
       (= 200 (:status response))
       (do
         (t/log! {:msg "Workflow instance executed"})
         (:body response))
       (or (>= 300 (:status response))
           (< 200 (:status response)))
-      (do
-        (t/log! {:level :warn
-                 :data {:status-code (:status response)}
-                 :msg "Workflow instance execution failed"}))
+      (t/log! {:level :warn
+               :data {:status-code (:status response)}
+               :msg "Workflow instance execution failed"})
       :else
       (t/log! {:level :warn
                :data {:status-code (:status response)}

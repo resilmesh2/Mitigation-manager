@@ -1,6 +1,6 @@
-;; Copyright (C) 2025 Ekam Puri Nieto (UMU), Antonio Skarmeta Gomez
-;; (UMU), Jorge Bernal Bernabe (UMU).  See LICENSE file in the project
-;; root for details.
+;; Copyright (C) 2025, 2026 Ekam Puri Nieto (UMU), Antonio Skarmeta
+;; Gomez (UMU), Jorge Bernal Bernabe (UMU).  See LICENSE file in the
+;; project root for details.
 
 (ns mitigation-engine.core
   (:require
@@ -9,13 +9,16 @@
    [aero.core :refer [read-config]]
    [mitigation-engine.repr :as repr]
    [mitigation-engine.state.alert :as a]
+   [mitigation-engine.state.attack :as at]
    [mitigation-engine.state.attack-graph :as ag]
+   [mitigation-engine.state.node :as n]
    [mitigation-engine.state.workflow :as wf]
    [mitigation-engine.state.workflow-instance :as wi]
    [mount.core :as mount])
   (:import
    (es.um.mitigation_engine MitigationEngine MitigationConstraintProvider)
    (es.um.mitigation_engine.model Mitigation)
+   (org.optaplanner.core.api.solver SolutionManager)
    (org.optaplanner.core.api.score.buildin.hardsoft HardSoftScore)
    (org.optaplanner.core.api.solver SolverFactory)
    (org.optaplanner.core.config.solver SolverConfig)
@@ -27,14 +30,32 @@
 
 (def impacted-nodes (async/chan 100))
 
-(defn update-state!
-  "Update the current state."
-  [alert callback]
-  (t/log! "Updating state")
-  (t/trace! {:id :state-update
+(defn prune-attacks []
+  (t/log! {:level :debug
+           :msg "Removing attack instances with no attack front"})
+  (swap! at/attacks (fn [attacks]
+                      (vec (filter #(not (empty? (:attack-front %)))
+                                   attacks)))))
+
+(defn update-state [alert]
+  (t/log! "Updating existing attacks")
+  (t/trace! {:id :existing-attack-update
              :level :debug
              :msg nil}
-            (swap! ag/attack-graphs #(vec (map (fn [g] (ag/update! g alert callback)) %)))))
+            (swap! at/attacks (fn [attacks] (vec (map #(at/update % alert) attacks)))))
+  (t/log! "Creating new attack instances")
+  (t/trace! {:id :new-attack-create
+             :level :debug
+             :msg nil}
+            (run! (fn [attack-graph]
+                    (let [initial-node (ag/get-initial-node attack-graph)]
+                      (when (n/triggered? initial-node alert nil)
+                        (t/log! {:level :debug
+                                 :data {:node initial-node
+                                        :alert alert}
+                                 :msg "Initial node triggered"})
+                        (swap! at/attacks conj (at/new alert (:id initial-node) attack-graph)))))
+                  @ag/attack-graphs)))
 
 (defn solve [alert parameters]
   (let [from-java (fn [solution]
@@ -89,9 +110,17 @@
     (t/log! {:data {:solution solution
                     :score (str score)}
              :msg "Solution found"})
-    (when (.isFeasible score)
+
+    (cond
+      (.isFeasible score)
       (doseq [w (from-java solution)]
-        (wi/run (:workflow w))))))
+        (wi/run (:workflow w)))
+      :else
+      (let [summary (-> (SolutionManager/create factory)
+                        (.explain solution)
+                        (.getSummary))]
+        (t/log! {:data {:summary summary}
+                 :msg "Solution explanation"})))))
 
 (defn handle-alert [alert]
   (t/log! {:data {:alert alert}
@@ -100,9 +129,6 @@
              :id :alert-handling
              :msg nil}
             (do
-              (update-state! alert
-                             (fn [node alert]
-                               (t/log! {:data {:node node
-                                               :alert alert}
-                                        :msg "Attack node triggered"})))
-              (solve alert nil))))
+              (update-state alert)
+              (solve alert nil)
+              (prune-attacks))))

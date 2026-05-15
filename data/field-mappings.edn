@@ -5,7 +5,7 @@
              :perm_after :file-permissions}
   :agent {:id :agent-id
           :ip :agent-ip}
-  :data {:dst_ip :connection-dst-ip
+  :data {:dest_ip :connection-dest-ip
          :src_port :connection-src-port
          :dst_port :connection-dst-port
          :pid :connection-pid
@@ -14,4 +14,6 @@
                              :source_port :flow-source-port
                              :destination_port :flow-destination-port
                              :attack_type :flow-attack-type
-                             :confidence :flow-confidence}}}]
+                             :confidence :flow-confidence}
+         :stix_bundle {:objects :stix-bundle-objects}
+         :integration :alert-integration}}]
