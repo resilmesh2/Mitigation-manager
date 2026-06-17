@@ -15,13 +15,6 @@
 
 (def resource-store {})
 
-(defmacro resource
-  "Create a pair of endpoints to manage a resource."
-  [name]
-  (let [path (str "/" name)]
-    `(list '(GET ~path [] (retrieve-resource resource-store ~name))
-           '(POST ~path ~'req (create-resource resource-store ~'req ~name)))))
-
 (defmacro when-json
   "If the incoming request doesn't have a JSON body, returns a Ring 406
   response.  Otherwise, it executes the provided forms."
@@ -42,13 +35,6 @@
       (core/handle-alert parsed-alert)
       (response/response {}))))
 
-(defn create-resource [store req type]
-  (when-json req
-    (throw (ex-info "Not yet implemented"))))
-
-(defn retrieve-resource [store type]
-  (response/response (throw (ex-info "Not yet implemented"))))
-
 (defn get-version []
   (let [v (:version core/config)
         v1 (get v 0)
@@ -63,10 +49,7 @@
     (GET "/" [] (response/response nil))
     (POST "/" ~'req (when-json ~'req (response/response nil)))
     (GET "/version" [] (response/response (get-version)))
-    (POST "/alert" ~'req (handle-alert ~'req))
-    ~@(resource "condition")
-    ~@(resource "node")
-    ~@(resource "workflow")))
+    (POST "/alert" ~'req (handle-alert ~'req))))
 
 (defn run-server []
   (run-jetty (-> (make-routes nil)
