@@ -4,6 +4,7 @@
 
 (ns mitigation-engine.state.common
   (:require
+   [clojure.edn :as edn]
    [clojure.spec.alpha :as s]
    [clojure.pprint :as pp]
    [duratom.core :as d]
@@ -45,7 +46,7 @@
 
 (defn read-db [file]
   (with-open [r (clojure.java.io/reader file)]
-    (read (java.io.PushbackReader. r))))
+    (edn/read (java.io.PushbackReader. r))))
 
 (defn write-db [file x]
   (with-open [r (clojure.java.io/writer file)]
