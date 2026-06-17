@@ -66,5 +66,6 @@
                      (:attack-front attack))
         new-attack-front (flatten (map :next updates))
         new-ctx (apply merge (keep :ctx updates))]
-    (clojure.core/update attack :attack-front (constantly new-attack-front))
-    (clojure.core/update attack :ctx merge new-ctx)))
+    (-> attack
+        (assoc :attack-front new-attack-front)
+        (clojure.core/update :ctx merge new-ctx))))
