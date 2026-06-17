@@ -1,6 +1,6 @@
 services:
   mitigation-manager:
-    container_name: ${CONTAINER_PREFIX}Mitigation-Manager
+    container_name: resilmesh-sop-mm
     env_file:
       - path: .env
         required: false
