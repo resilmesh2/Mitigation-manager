@@ -13,11 +13,11 @@
     :mitre-ids ("T1222.002"),
     :conditions
     {:file-is-python-script
-     [:eval (and (:file-path *ctx*)
-             (clojure.string/ends-with? (:file-path *ctx*) ".py"))]
+     [:eval (and (:file-path *alert*)
+             (clojure.string/ends-with? (:file-path *alert*) ".py"))]
      :file-is-executable
-     [:eval (and (:file-permissions *ctx*)
-             (clojure.string/includes? (:file-permissions *ctx*) "x"))]},
+     [:eval (and (:file-permissions *alert*)
+             (clojure.string/includes? (:file-permissions *alert*) "x"))]},
     :extract {}
     :previous (#uuid "d422d11d-1667-4bc3-93e0-8a36f2a64654"),
     :next (#uuid "f4c86f49-1a00-4dbd-a165-ca8f91c6d48c")}
@@ -26,11 +26,11 @@
     :mitre-ids ("T1204.002"),
     :conditions
     {:file-is-python-script
-     [:eval (and (:file-path *ctx*)
-             (clojure.string/ends-with? (:file-path *ctx*) ".py"))]
+     [:eval (and (:file-path *alert*)
+             (clojure.string/ends-with? (:file-path *alert*) ".py"))]
      :file-is-ransomware
-     [:eval (and (:file-path *ctx*)
-             (clojure.string/includes? (:file-path *ctx*) "zerologon"))]},
+     [:eval (and (:file-path *alert*)
+             (clojure.string/includes? (:file-path *alert*) "zerologon"))]},
     :extract {},
     :next (),
     :previous (#uuid "bf4f7379-a0b1-4f87-8771-e43af18ca6c8")}),
