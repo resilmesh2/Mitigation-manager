@@ -47,12 +47,11 @@
       (t/log! {:level :error
                :data {:response response}
                :msg "Workflow instance execution returned no status code"})
-      (= 200 (:status response))
+      (<= 200 (:status response) 299)
       (do
         (t/log! {:msg "Workflow instance executed"})
         (:body response))
-      (or (>= 300 (:status response))
-          (< 200 (:status response)))
+      (<= 300 (:status response) 599)
       (t/log! {:level :warn
                :data {:status-code (:status response)}
                :msg "Workflow instance execution failed"})
