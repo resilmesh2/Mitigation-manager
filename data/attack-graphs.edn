@@ -106,10 +106,10 @@
     :next (),
     :previous ()}),
   :initial-node #uuid "b6c39a9a-2eb4-4ac3-b3f8-dede91fb659a"}
- {:id #uuid "665c2994-a11f-4536-ad81-f8b2b986fc2b"
+ {:id #uuid "87396405-384e-4ce7-bfec-a3f517de6f01"
   :description "Pilot 2 - CARM - Known vulnerability",
   :nodes
-  ({:id #uuid "81e4d895-502a-4a15-84e7-c142392062a5",
+  ({:id #uuid "0b5d7437-2901-4e3e-b72f-e5317089ed16",
     :description "Scan using nmap",
     :mitre-ids ("T1046"),
     :conditions
@@ -158,7 +158,7 @@
      [:static "192.168.56.1"]}
     :next (),
     :previous ()}),
-  :initial-node #uuid "81e4d895-502a-4a15-84e7-c142392062a5"}
+  :initial-node #uuid "0b5d7437-2901-4e3e-b72f-e5317089ed16"}
  {:id #uuid "2168d2b0-dd5c-4f6a-9208-d60feaad3845"
   :description "Pilot 2 - CARM - XXE",
   :nodes
