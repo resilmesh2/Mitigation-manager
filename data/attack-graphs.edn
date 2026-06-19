@@ -46,9 +46,9 @@
      [:eval (when-let [victim-ip (:flow-destination-ip *alert*)]
              (let [firewall-ip "10.185.2.98"
                    mask-bits 28
-                   ip->long #(reduce (fn [acc b] (+ (bit-shift-left acc 8) (bit-and b 0xFF)))
+                   ip->long (fn [ip] (reduce (fn [acc b] (+ (bit-shift-left acc 8) (bit-and b 0xFF)))
                               0
-                              (.getAddress (java.net.InetAddress/getByName %)))
+                              (.getAddress (java.net.InetAddress/getByName ip))))
                    mask (bit-shift-left -1 (- 32 mask-bits))]
               (= (bit-and (ip->long firewall-ip) mask)
                (bit-and (ip->long victim-ip) mask))
@@ -56,7 +56,7 @@
      :dos-alert-type
      [:eval (when-let [attack-type (:flow-attack-type *alert*)]
              (let [valid-identifiers ["Slowloris"]]
-              (some #(= attack-type %) valid-identifiers)))]}
+              (some (fn [id] (= attack-type id)) valid-identifiers)))]}
     :extract {},
     :next (),
     :previous ()}),
@@ -72,9 +72,9 @@
      [:eval (when-let [victim-ip (:flow-destination-ip *alert*)]
              (let [firewall-ip "10.185.2.98"
                    mask-bits 28
-                   ip->long #(reduce (fn [acc b] (+ (bit-shift-left acc 8) (bit-and b 0xFF)))
+                   ip->long (fn [ip] (reduce (fn [acc b] (+ (bit-shift-left acc 8) (bit-and b 0xFF)))
                               0
-                              (.getAddress (java.net.InetAddress/getByName %)))
+                              (.getAddress (java.net.InetAddress/getByName ip))))
                    mask (bit-shift-left -1 (- 32 mask-bits))]
               (= (bit-and (ip->long firewall-ip) mask)
                (bit-and (ip->long victim-ip) mask))
@@ -82,7 +82,7 @@
      :bruteforce-alert-type
      [:eval (when-let [attack-type (:flow-attack-type *alert*)]
              (let [valid-identifiers ["Bruteforce"]]
-              (some #(= attack-type %) valid-identifiers)))]},
+              (some (fn [id] (= attack-type id)) valid-identifiers)))]},
     :extract {}
     :next (),
     :previous ()}),
@@ -122,16 +122,16 @@
      :firewall-available
      [:eval (when-let [victim-ip (let [objects (:stix-bundle-objects *alert*)]
                                   (->> objects
-                                   (filter #(= (:relationship_type %) "targets"))
+                                   (filter (fn [o] (= (:relationship_type o) "targets")))
                                    first
                                    :target_ref
                                    (get (into {} (map (juxt :id identity) objects)))
                                    :value))]
              (let [firewall-ip "192.168.56.1"
                    mask-bits 24
-                   ip->long #(reduce (fn [acc b] (+ (bit-shift-left acc 8) (bit-and b 0xFF)))
+                   ip->long (fn [ip] (reduce (fn [acc b] (+ (bit-shift-left acc 8) (bit-and b 0xFF)))
                               0
-                              (.getAddress (java.net.InetAddress/getByName %)))
+                              (.getAddress (java.net.InetAddress/getByName ip))))
                    mask (bit-shift-left -1 (- 32 mask-bits))]
               (= (bit-and (ip->long firewall-ip) mask)
                (bit-and (ip->long victim-ip) mask))
@@ -141,7 +141,7 @@
      [:eval (let [objects (:stix-bundle-objects *alert*)
                   by-id (into {} (map (juxt :id identity) objects))]
              (->> objects
-              (filter #(= (:type %) "network-traffic"))
+              (filter (fn [o] (= (:type o) "network-traffic")))
               first
               :src_ref
               (get by-id)
@@ -149,7 +149,7 @@
      :ip-dst
      [:eval (let [objects (:stix-bundle-objects *alert*)]
              (->> objects
-              (filter #(= (:relationship_type %) "targets"))
+              (filter (fn [o] (= (:relationship_type o) "targets")))
               first
               :target_ref
               (get (into {} (map (juxt :id identity) objects)))
@@ -174,7 +174,7 @@
      [:eval (-> *alert* :alert-integration (= "xxe_flow_to_stix") (or nil))]},
     :extract
     {:portal-ip [:eval (let [url (->> (:stix-bundle-objects *alert*)
-                                  (filter #(= (:type %) "url"))
+                                  (filter (fn [o] (= (:type o) "url")))
                                   first
                                   :value)]
                         (-> (java.net.URI. url) .getHost))]
@@ -197,7 +197,7 @@
      [:eval (-> *alert* :alert-integration (= "phishing_flow_to_stix") (or nil))]},
     :extract
     {:ip-src [:eval (->> (:stix-bundle-objects *alert*)
-                     (filter #(= (:type %) "ipv4-addr"))
+                     (filter (fn [o] (= (:type o) "ipv4-addr")))
                      first
                      :value)]
      :firewall-ip [:static "192.168.56.1"]},
