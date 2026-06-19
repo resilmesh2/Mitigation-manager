@@ -48,16 +48,16 @@
    [:eval (when (:stix-bundle-objects *ctx*)
            (let [isim-query "MATCH (a:Application)--(d:Device) WHERE a.name = 'ldap (port 389/tcp)' RETURN d.name AS address"
                  servers (mitigation-engine.csap/check isim-query {})
-                 victim-ip (second (re-find #"ipv4-addr:value = '([^']+)'" (->> *ctx*
+                 victim-ip (second (re-find (re-pattern "ipv4-addr:value = '([^']+)'") (->> *ctx*
                                                                             :stix-bundle-objects
-                                                                            (filter #(= (:type %) "indicator"))
+                                                                            (filter (fn [o] (= (:type o) "indicator")))
                                                                             first
                                                                             :pattern)))]
             (some (fn [server]
                    (when server
-                    (let [ip->long #(reduce (fn [acc b] (+ (bit-shift-left acc 8) (bit-and b 0xFF)))
+                    (let [ip->long (fn [ip] (reduce (fn [acc b] (+ (bit-shift-left acc 8) (bit-and b 0xFF)))
                                      0
-                                     (.getAddress (java.net.InetAddress/getByName %)))
+                                     (.getAddress (java.net.InetAddress/getByName ip))))
                           net "192.168.56.0"
                           mask-bits "24"
                           mask-bits (Integer/parseInt mask-bits)
