@@ -9,8 +9,4 @@ services:
     expose:
       - ${PORT:-8002}
     networks:
-      external:
-networks:
-  external:
-    external: true
-    name: ${CONTAINER_NETWORK}
+      - resilmesh_network
